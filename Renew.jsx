@@ -124,14 +124,28 @@ const SCRIPTURE_CATEGORIES = [
     subtitle: "this is you",
     icon: "\u{1FA9E}",
     passages: [
+      // Identity
       { ref: "2 Corinthians 5:17", text: "Therefore, if anyone is in Christ, he is a new creation. The old has passed away; behold, the new has come." },
       { ref: "1 Peter 2:9", text: "But you are a chosen race, a royal priesthood, a holy nation, a people for his own possession, that you may proclaim the excellencies of him who called you out of darkness into his marvelous light." },
-      { ref: "Romans 8:37\u201339", text: "No, in all these things we are more than conquerors through him who loved us. For I am sure that neither death nor life, nor angels nor rulers, nor things present nor things to come, nor powers, nor height nor depth, nor anything else in all creation, will be able to separate us from the love of God in Christ Jesus our Lord." },
-      { ref: "Ephesians 2:10", text: "For we are his workmanship, created in Christ Jesus for good works, which God prepared beforehand, that we should walk in them." },
-      { ref: "Psalm 139:14", text: "I praise you, for I am fearfully and wonderfully made. Wonderful are your works; my soul knows it very well." },
-      { ref: "Galatians 2:20", text: "I have been crucified with Christ. It is no longer I who live, but Christ who lives in me. And the life I now live in the flesh I live by faith in the Son of God, who loved me and gave himself for me." },
       { ref: "John 1:12", text: "But to all who did receive him, who believed in his name, he gave the right to become children of God." },
+      { ref: "Galatians 2:20", text: "I have been crucified with Christ. It is no longer I who live, but Christ who lives in me. And the life I now live in the flesh I live by faith in the Son of God, who loved me and gave himself for me." },
+      // Purpose
+      { ref: "Ephesians 2:10", text: "For we are his workmanship, created in Christ Jesus for good works, which God prepared beforehand, that we should walk in them." },
+      { ref: "Jeremiah 1:5", text: "Before I formed you in the womb I knew you, and before you were born I consecrated you; I appointed you a prophet to the nations." },
       { ref: "Colossians 3:3", text: "For you have died, and your life is hidden with Christ in God." },
+      // Spirit
+      { ref: "Romans 8:16", text: "The Spirit himself bears witness with our spirit that we are children of God." },
+      { ref: "John 4:24", text: "God is spirit, and those who worship him must worship in spirit and truth." },
+      { ref: "1 Corinthians 2:12", text: "Now we have received not the spirit of the world, but the Spirit who is from God, that we might understand the things freely given us by God." },
+      // Soul
+      { ref: "Psalm 139:14", text: "I praise you, for I am fearfully and wonderfully made. Wonderful are your works; my soul knows it very well." },
+      { ref: "Psalm 42:1-2", text: "As a deer pants for flowing streams, so pants my soul for you, O God. My soul thirsts for God, for the living God." },
+      { ref: "3 John 1:2", text: "Beloved, I pray that all may go well with you and that you may be in good health, as it goes well with your soul." },
+      // Body
+      { ref: "1 Corinthians 6:19-20", text: "Do you not know that your body is a temple of the Holy Spirit within you, whom you have from God? You are not your own, for you were bought with a price. So glorify God in your body." },
+      { ref: "Romans 12:1", text: "I appeal to you therefore, brothers, by the mercies of God, to present your bodies as a living sacrifice, holy and acceptable to God, which is your spiritual worship." },
+      // Spirit, Soul & Body
+      { ref: "1 Thessalonians 5:23", text: "Now may the God of peace himself sanctify you completely, and may your whole spirit and soul and body be kept blameless at the coming of our Lord Jesus Christ." },
     ]
   },
   {
@@ -1157,15 +1171,18 @@ export default function Renew() {
   const renderHome = () => (
     <div style={{
       position: "absolute", inset: 0, zIndex: 20,
-      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+      display: "flex", flexDirection: "column", alignItems: "center",
       background: "radial-gradient(ellipse at 50% 40%, rgba(124,106,255,0.04) 0%, #000 70%)",
       padding: 28,
       paddingTop: "max(28px, env(safe-area-inset-top, 28px))",
-      paddingBottom: "max(80px, calc(80px + env(safe-area-inset-bottom, 0px)))",
+      paddingBottom: "max(28px, env(safe-area-inset-bottom, 28px))",
       paddingLeft: "max(28px, env(safe-area-inset-left, 28px))",
       paddingRight: "max(28px, env(safe-area-inset-right, 28px))",
       fontFamily: FONT,
     }}>
+      {/* Spacer to push content above true center */}
+      <div style={{ flex: "1 1 0" }} />
+
       {/* Logo mark */}
       <div style={{
         width: 48, height: 48, borderRadius: "50%",
@@ -1249,6 +1266,9 @@ export default function Renew() {
           View History
         </button>
       )}
+
+      {/* Bottom spacer — larger than top so content sits above true center */}
+      <div style={{ flex: "1.6 1 0" }} />
 
       {/* Footer verse */}
       <div style={{ position: "absolute", bottom: "max(24px, env(safe-area-inset-bottom, 24px))", left: 20, right: 20, textAlign: "center" }}>
