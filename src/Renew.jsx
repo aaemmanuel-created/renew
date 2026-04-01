@@ -609,8 +609,22 @@ export default function Renew() {
     setIsListening(false); setIsSpeaking(false); setVolume(0);
   }, [disposeTone]);
 
+  const playEndSound = useCallback(() => {
+    try {
+      // Gentle descending chime — signals completion
+      const t = toneRef.current;
+      if (t && t.fireSynth) {
+        t.fireSynth.triggerAttackRelease("E5", "8n", Tone.now());
+        t.fireSynth.triggerAttackRelease("C5", "8n", Tone.now() + 0.12);
+        t.fireSynth.triggerAttackRelease("G4", "4n", Tone.now() + 0.24);
+      }
+    } catch {}
+  }, []);
+
   const endSession = useCallback(() => {
-    disposeTone();
+    playEndSound();
+    // Small delay so the chime is heard before Tone disposes
+    setTimeout(() => disposeTone(), 600);
     const dur = totalTime, nc = neuronCount, pc = synapseCount;
     // Capture ending stats and compute growth
     const endStats = {
@@ -638,7 +652,7 @@ export default function Renew() {
       setCurrentStreak(newStreak); if (newStreak > longestStreak) setLongestStreak(newStreak);
       setScreen("summary");
     } else { setScreen(selectedCategory ? "pick-passage" : "home"); }
-  }, [totalTime, neuronCount, synapseCount, selectedPassage, selectedCategory, customRef, stopListening, saveCurrentNetwork, currentStreak, longestStreak, disposeTone]);
+  }, [totalTime, neuronCount, synapseCount, selectedPassage, selectedCategory, customRef, stopListening, saveCurrentNetwork, currentStreak, longestStreak, disposeTone, playEndSound]);
 
   // ─── Render loop ───
   useEffect(() => {
@@ -1442,7 +1456,7 @@ export default function Renew() {
 
       {/* Joshua 1:8 */}
       <div style={{
-        position: "absolute", bottom: 64, left: 0, right: 0,
+        position: "absolute", bottom: 120, left: 0, right: 0,
         textAlign: "center", zIndex: 10, padding: "0 20px", fontFamily: FONT,
       }}>
         <div style={{
@@ -1460,27 +1474,29 @@ export default function Renew() {
         </div>
       </div>
 
-      {/* Bottom controls — voice waveform + end */}
+      {/* Bottom controls — voice waveform + status + end */}
       <div style={{
-        position: "absolute", bottom: 16, left: 0, right: 0,
-        display: "flex", flexDirection: "column", alignItems: "center", gap: 8, zIndex: 10, fontFamily: FONT,
+        position: "absolute", bottom: 0, left: 0, right: 0,
+        display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
+        zIndex: 10, fontFamily: FONT,
+        paddingBottom: "max(16px, env(safe-area-inset-bottom, 16px))",
+        paddingTop: 10,
+        background: "linear-gradient(0deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 70%, transparent 100%)",
       }}>
         {/* Live waveform visualizer — reacts to actual voice volume */}
         <div style={{
-          display: "flex", alignItems: "center", gap: 2.5, height: 40,
+          display: "flex", alignItems: "center", gap: 2.5, height: 36,
           padding: "0 12px",
         }}>
           {Array.from({length: 16}, (_, i) => {
-            // Create a smooth wave pattern centered on the middle bars
             const center = 7.5;
-            const dist = Math.abs(i - center) / center; // 0 at center, 1 at edges
-            const wave = 1 - dist * 0.7; // taller in center
-            // Volume drives height — each bar has slight phase offset for organic movement
+            const dist = Math.abs(i - center) / center;
+            const wave = 1 - dist * 0.7;
             const phase = Date.now() * 0.004 + i * 0.6;
             const ripple = Math.sin(phase) * 0.3 + 0.7;
             const h = isSpeaking
               ? 4 + volume * 55 * wave * ripple
-              : 2 + Math.sin(Date.now() * 0.002 + i * 0.4) * 1; // subtle idle breathing
+              : 2 + Math.sin(Date.now() * 0.002 + i * 0.4) * 1;
             return (
               <div key={i} style={{
                 width: 2.5, borderRadius: 2,
@@ -1498,17 +1514,27 @@ export default function Renew() {
           })}
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <span style={{
-            fontSize: 9, color: isSpeaking ? P.fire : P.textDim,
-            fontWeight: 500, letterSpacing: 1.5, fontFamily: FONT,
-            textTransform: "uppercase", transition: "color 0.3s",
-          }}>
-            {isSpeaking ? "speaking" : "listening"}
-          </span>
-          <div style={{ width: 1, height: 12, background: P.cardBorder }} />
-          <button onClick={endSession} style={{ ...btnGhost, padding: "6px 16px", fontSize: 9, borderColor: "transparent" }}>End</button>
-        </div>
+        <span style={{
+          fontSize: 9, color: isSpeaking ? P.fire : P.textDim,
+          fontWeight: 500, letterSpacing: 1.5, fontFamily: FONT,
+          textTransform: "uppercase", transition: "color 0.3s",
+        }}>
+          {isSpeaking ? "speaking" : "listening"}
+        </span>
+
+        {/* End button — large touch target for mobile */}
+        <button onClick={endSession} style={{
+          ...btnGhost,
+          marginTop: 4,
+          padding: "12px 40px",
+          fontSize: 11,
+          letterSpacing: 2,
+          borderColor: P.textGhost,
+          color: P.textSoft,
+          borderRadius: 24,
+          minHeight: 44,
+          WebkitTapHighlightColor: "transparent",
+        }}>END</button>
       </div>
 
       {isSpeaking && (
