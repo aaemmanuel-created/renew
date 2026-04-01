@@ -1161,7 +1161,7 @@ export default function Renew() {
       background: "radial-gradient(ellipse at 50% 40%, rgba(124,106,255,0.04) 0%, #000 70%)",
       padding: 28,
       paddingTop: "max(28px, env(safe-area-inset-top, 28px))",
-      paddingBottom: "max(28px, env(safe-area-inset-bottom, 28px))",
+      paddingBottom: "max(80px, calc(80px + env(safe-area-inset-bottom, 0px)))",
       paddingLeft: "max(28px, env(safe-area-inset-left, 28px))",
       paddingRight: "max(28px, env(safe-area-inset-right, 28px))",
       fontFamily: FONT,
@@ -1478,40 +1478,38 @@ export default function Renew() {
         </div>
       )}
 
-      {/* Joshua 1:8 */}
-      <div style={{
-        position: "absolute", bottom: 120, left: 0, right: 0,
-        textAlign: "center", zIndex: 10, padding: "0 20px", fontFamily: FONT,
-      }}>
-        <div style={{
-          color: isSpeaking ? P.textDim : P.textGhost,
-          fontSize: 9, fontStyle: "italic", lineHeight: 1.6, transition: "color 0.5s",
-          maxWidth: 360, margin: "0 auto", fontWeight: 300,
-        }}>
-          "This Book of the Law shall not depart from your mouth..."
-        </div>
-        <div style={{
-          color: isSpeaking ? P.textDim : P.textGhost,
-          fontSize: 7, marginTop: 4, fontWeight: 700, letterSpacing: 2, transition: "color 0.5s",
-        }}>
-          JOSHUA 1:8
-        </div>
-      </div>
-
-      {/* Bottom controls — voice waveform + status + end */}
+      {/* Bottom controls — Joshua 1:8 + waveform + status + end */}
       <div style={{
         position: "absolute", bottom: 0, left: 0, right: 0,
-        display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
+        display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
         zIndex: 10, fontFamily: FONT,
-        paddingBottom: "max(16px, env(safe-area-inset-bottom, 16px))",
+        paddingBottom: "max(12px, env(safe-area-inset-bottom, 12px))",
         paddingLeft: "env(safe-area-inset-left, 0px)",
         paddingRight: "env(safe-area-inset-right, 0px)",
-        paddingTop: 10,
-        background: "linear-gradient(0deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 70%, transparent 100%)",
+        paddingTop: 14,
+        background: "linear-gradient(0deg, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.6) 60%, transparent 100%)",
       }}>
-        {/* Live waveform visualizer — reacts to actual voice volume */}
+        {/* Joshua 1:8 — compact */}
+        <div style={{ textAlign: "center", padding: "0 20px", marginBottom: 2 }}>
+          <div style={{
+            color: isSpeaking ? P.textDim : P.textGhost,
+            fontSize: 8, fontStyle: "italic", lineHeight: 1.5, transition: "color 0.5s",
+            fontWeight: 300, fontFamily: FONT,
+          }}>
+            "This Book of the Law shall not depart from your mouth..."
+          </div>
+          <div style={{
+            color: isSpeaking ? P.textDim : P.textGhost,
+            fontSize: 7, marginTop: 2, fontWeight: 700, letterSpacing: 2, transition: "color 0.5s",
+            fontFamily: FONT,
+          }}>
+            JOSHUA 1:8
+          </div>
+        </div>
+
+        {/* Live waveform visualizer */}
         <div style={{
-          display: "flex", alignItems: "center", gap: 2.5, height: 36,
+          display: "flex", alignItems: "center", gap: 2.5, height: 28,
           padding: "0 12px",
         }}>
           {Array.from({length: 16}, (_, i) => {
@@ -1551,7 +1549,7 @@ export default function Renew() {
         {/* End button — large touch target for mobile */}
         <button onClick={endSession} style={{
           ...btnGhost,
-          marginTop: 4,
+          marginTop: 2,
           padding: "12px 40px",
           fontSize: 11,
           letterSpacing: 2,
@@ -1728,7 +1726,7 @@ export default function Renew() {
 
   return (
     <div style={{
-      background: P.black, width: "100%", height: "100vh",
+      background: P.black, width: "100%", height: "100dvh",
       position: "relative", overflow: "hidden", fontFamily: FONT,
     }}>
       <div style={{ position: "absolute", inset: 0 }}>
