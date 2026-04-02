@@ -21,29 +21,50 @@ if (!document.getElementById(STYLE_ID)) {
   const styleEl = document.createElement("style");
   styleEl.id = STYLE_ID;
   styleEl.textContent = `
+    /* ── Silk-smooth easing curves ── */
+    /* Soft deceleration — like settling into place */
+    /* cubic-bezier(0.22, 1, 0.36, 1) = smooth overshoot-free ease-out */
+    /* cubic-bezier(0.0, 0, 0.2, 1)  = Material-style decelerate */
+
     @keyframes renewFadeInUp {
-      from { opacity: 0; transform: translateY(16px); }
-      to { opacity: 1; transform: translateY(0); }
+      0% {
+        opacity: 0;
+        transform: translateY(22px) scale(0.98);
+        filter: blur(6px);
+      }
+      100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        filter: blur(0px);
+      }
     }
     @keyframes renewFadeIn {
-      from { opacity: 0; }
-      to { opacity: 1; }
+      0% { opacity: 0; filter: blur(4px); }
+      100% { opacity: 1; filter: blur(0px); }
     }
     @keyframes renewBreathe {
-      0%, 100% { opacity: 0.3; }
-      50% { opacity: 0.6; }
+      0%, 100% { opacity: 0.25; }
+      50% { opacity: 0.55; }
     }
     @keyframes renewPulseGlow {
-      0%, 100% { box-shadow: 0 0 20px rgba(124, 106, 255, 0.15), 0 0 40px rgba(124, 106, 255, 0.05); }
-      50% { box-shadow: 0 0 25px rgba(124, 106, 255, 0.25), 0 0 50px rgba(124, 106, 255, 0.1); }
+      0%, 100% { box-shadow: 0 0 20px rgba(124, 106, 255, 0.12), 0 0 50px rgba(124, 106, 255, 0.04); }
+      50% { box-shadow: 0 0 28px rgba(124, 106, 255, 0.22), 0 0 60px rgba(124, 106, 255, 0.08); }
     }
     @keyframes renewStatusPulse {
-      0%, 100% { opacity: 0.7; }
+      0%, 100% { opacity: 0.65; }
       50% { opacity: 1; }
     }
     @keyframes renewStaggerIn {
-      from { opacity: 0; transform: translateY(10px); }
-      to { opacity: 1; transform: translateY(0); }
+      0% {
+        opacity: 0;
+        transform: translateY(14px) scale(0.98);
+        filter: blur(4px);
+      }
+      100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        filter: blur(0px);
+      }
     }
     @keyframes renewShimmer {
       0% { background-position: -200% 0; }
@@ -56,16 +77,50 @@ if (!document.getElementById(STYLE_ID)) {
       75% { opacity: 0.85; text-shadow: 0 0 6px rgba(251,146,60,0.4); }
     }
     @keyframes renewLogoEntrance {
-      0% { opacity: 0; transform: scale(0.8) translateY(10px); }
-      100% { opacity: 1; transform: scale(1) translateY(0); }
+      0% {
+        opacity: 0;
+        transform: scale(0.6) translateY(12px);
+        filter: blur(10px);
+      }
+      60% {
+        opacity: 0.8;
+        transform: scale(1.03) translateY(-1px);
+        filter: blur(1px);
+      }
+      100% {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+        filter: blur(0px);
+      }
     }
     @keyframes renewDividerGrow {
-      from { width: 0; opacity: 0; }
-      to { width: 32px; opacity: 1; }
+      0% { width: 0; opacity: 0; }
+      100% { width: 32px; opacity: 1; }
     }
     @keyframes renewCountUp {
-      from { opacity: 0; transform: translateY(8px); }
-      to { opacity: 1; transform: translateY(0); }
+      0% {
+        opacity: 0;
+        transform: translateY(12px) scale(0.95);
+        filter: blur(6px);
+      }
+      100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        filter: blur(0px);
+      }
+    }
+    /* Soft float-in for screen transitions */
+    @keyframes renewScreenEnter {
+      0% {
+        opacity: 0;
+        transform: translateY(12px);
+        filter: blur(8px);
+      }
+      100% {
+        opacity: 1;
+        transform: translateY(0);
+        filter: blur(0px);
+      }
     }
     /* Noise texture overlay */
     .renew-noise::before {
@@ -79,14 +134,17 @@ if (!document.getElementById(STYLE_ID)) {
       pointer-events: none;
       z-index: 1;
     }
-    /* Button tap feedback */
-    .renew-btn-tap { transition: transform 0.1s ease-out, box-shadow 0.2s ease; }
-    .renew-btn-tap:active { transform: scale(0.97) !important; }
+    /* Button tap feedback — silk-smooth */
+    .renew-btn-tap {
+      transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.4s ease, opacity 0.3s ease;
+      will-change: transform;
+    }
+    .renew-btn-tap:active { transform: scale(0.96) !important; }
     /* Smooth scrolling for passage lists */
     .renew-smooth-scroll { scroll-behavior: smooth; -webkit-overflow-scrolling: touch; }
-    /* Screen transitions */
+    /* Screen transitions — silk float-in */
     .renew-screen-enter {
-      animation: renewFadeInUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+      animation: renewScreenEnter 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
     }
   `;
   document.head.appendChild(styleEl);
@@ -1235,14 +1293,15 @@ export default function Renew() {
   const sessionPillarUI = getPillarColors(selectedCategory?.name);
   const pillarAccentCSS = `rgb(${sessionPillarUI.fire[0]}, ${sessionPillarUI.fire[1]}, ${sessionPillarUI.fire[2]})`;
 
-  // ─── Shared styles ───
+  // ─── Shared styles — silk-smooth transitions ───
+  const silk = "cubic-bezier(0.22, 1, 0.36, 1)"; // smooth deceleration
   const card = {
     background: P.card,
     border: `1px solid ${P.cardBorder}`,
     borderRadius: 14,
     padding: 18,
     fontFamily: FONT,
-    transition: "border-color 0.3s ease, background 0.3s ease, box-shadow 0.3s ease",
+    transition: `border-color 0.4s ${silk}, background 0.4s ${silk}, box-shadow 0.5s ${silk}`,
   };
 
   const btnMain = {
@@ -1257,7 +1316,7 @@ export default function Renew() {
     fontFamily: FONT,
     letterSpacing: 1,
     textTransform: "uppercase",
-    transition: "all 0.25s ease",
+    transition: `all 0.4s ${silk}`,
     boxShadow: `0 0 30px ${P.accentGlow}, 0 2px 8px rgba(0,0,0,0.3)`,
   };
 
@@ -1273,13 +1332,13 @@ export default function Renew() {
     fontWeight: 500,
     letterSpacing: 0.8,
     textTransform: "uppercase",
-    transition: "all 0.25s ease",
+    transition: `all 0.4s ${silk}`,
   };
 
   const backBtn = {
     background: "none", border: "none", color: P.textSoft, fontSize: 12,
     cursor: "pointer", fontFamily: FONT, padding: "4px 0", marginBottom: 16,
-    letterSpacing: 0.8, fontWeight: 500, transition: "color 0.2s",
+    letterSpacing: 0.8, fontWeight: 500, transition: `color 0.35s ${silk}`,
   };
 
   const labelStyle = {
@@ -1311,28 +1370,28 @@ export default function Renew() {
       fontFamily: FONT,
     }}>
 
-      {/* Logo mark — with entrance animation */}
+      {/* Logo mark — silky entrance */}
       <div style={{
         width: 44, height: 44, borderRadius: "50%",
         background: "radial-gradient(circle, rgba(165,180,252,0.18), rgba(79,70,229,0.06) 60%, transparent 80%)",
         display: "flex", alignItems: "center", justifyContent: "center",
         marginBottom: 12,
-        animation: "renewLogoEntrance 0.8s cubic-bezier(0.16, 1, 0.3, 1) both",
-        animationDelay: "0.1s",
+        animation: "renewLogoEntrance 1.4s cubic-bezier(0.22, 1, 0.36, 1) both",
+        animationDelay: "0.15s",
       }}>
         <div style={{
           width: 9, height: 9, borderRadius: "50%",
           background: "radial-gradient(circle, #A5B4FC, #6366F1)",
           boxShadow: "0 0 20px rgba(165,180,252,0.5), 0 0 40px rgba(124,106,255,0.15)",
-          animation: "renewPulseGlow 4s ease-in-out infinite",
+          animation: "renewPulseGlow 5s ease-in-out infinite",
         }} />
       </div>
 
       <h1 style={{
         color: P.white, fontSize: 15, fontWeight: 700, margin: 0,
         letterSpacing: 8, textTransform: "uppercase", fontFamily: FONT,
-        animation: "renewFadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both",
-        animationDelay: "0.25s",
+        animation: "renewFadeInUp 1s cubic-bezier(0.22, 1, 0.36, 1) both",
+        animationDelay: "0.4s",
       }}>
         RENEW
       </h1>
@@ -1340,14 +1399,14 @@ export default function Renew() {
       <div style={{
         height: 1, background: `linear-gradient(90deg, transparent, ${P.cardBorder}, transparent)`,
         margin: "10px 0",
-        animation: "renewDividerGrow 0.8s cubic-bezier(0.16, 1, 0.3, 1) both",
-        animationDelay: "0.4s",
+        animation: "renewDividerGrow 1.2s cubic-bezier(0.22, 1, 0.36, 1) both",
+        animationDelay: "0.65s",
       }} />
 
       {isFirstTime ? (
         <div style={{
-          animation: "renewFadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both",
-          animationDelay: "0.5s", textAlign: "center",
+          animation: "renewFadeInUp 1.1s cubic-bezier(0.22, 1, 0.36, 1) both",
+          animationDelay: "0.85s", textAlign: "center",
         }}>
           <p style={{
             color: P.textSoft, fontSize: 14, fontWeight: 300, textAlign: "center",
@@ -1366,8 +1425,8 @@ export default function Renew() {
         </div>
       ) : (
         <div style={{
-          animation: "renewFadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both",
-          animationDelay: "0.5s", textAlign: "center",
+          animation: "renewFadeInUp 1.1s cubic-bezier(0.22, 1, 0.36, 1) both",
+          animationDelay: "0.85s", textAlign: "center",
         }}>
           <p style={{
             color: P.textSoft, fontSize: 13, fontWeight: 300, textAlign: "center",
@@ -1400,8 +1459,8 @@ export default function Renew() {
       )}
 
       <div style={{
-        animation: "renewFadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both",
-        animationDelay: "0.65s", display: "flex", flexDirection: "column", alignItems: "center",
+        animation: "renewFadeInUp 1.2s cubic-bezier(0.22, 1, 0.36, 1) both",
+        animationDelay: "1.15s", display: "flex", flexDirection: "column", alignItems: "center",
       }}>
         <button className="renew-btn-tap" onClick={() => setScreen("pick-category")} style={{
           ...btnMain,
@@ -1426,7 +1485,7 @@ export default function Renew() {
       {/* Footer verse — breathing opacity animation */}
       <div style={{
         position: "absolute", bottom: "max(24px, env(safe-area-inset-bottom, 24px))", left: 20, right: 20, textAlign: "center",
-        animation: "renewBreathe 6s ease-in-out infinite",
+        animation: "renewBreathe 8s cubic-bezier(0.37, 0, 0.63, 1) infinite",
       }}>
         <div style={{ color: P.textGhost, fontSize: 9, fontStyle: "italic", lineHeight: 1.6, fontFamily: FONT_BODY, letterSpacing: 0.3 }}>
           "This Book of the Law shall not depart from your mouth..."
@@ -1466,7 +1525,7 @@ export default function Renew() {
             ...card, cursor: "pointer", display: "flex", alignItems: "center", gap: 14,
             textAlign: "left", position: "relative", overflow: "hidden", padding: "18px 18px 18px 22px",
             borderLeft: `3px solid ${accentCSS}`,
-            animation: `renewStaggerIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both`,
+            animation: `renewStaggerIn 0.7s cubic-bezier(0.22, 1, 0.36, 1) both`,
             animationDelay: `${i * 0.08}s`,
           }}
           onMouseEnter={e => { e.currentTarget.style.borderColor = accentCSS; e.currentTarget.style.background = P.surface; e.currentTarget.style.boxShadow = `0 0 20px rgba(${cc[0]}, ${cc[1]}, ${cc[2]}, 0.08)`; }}
@@ -1520,7 +1579,7 @@ export default function Renew() {
               padding: "16px 16px 16px 20px",
               background: hasSaved ? `rgba(${sessionPillarUI.fire[0]}, ${sessionPillarUI.fire[1]}, ${sessionPillarUI.fire[2]}, 0.03)` : P.card,
               boxShadow: hasSaved ? `inset 0 0 30px rgba(${sessionPillarUI.fire[0]}, ${sessionPillarUI.fire[1]}, ${sessionPillarUI.fire[2]}, 0.04)` : "none",
-              animation: `renewStaggerIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) both`,
+              animation: `renewStaggerIn 0.7s cubic-bezier(0.22, 1, 0.36, 1) both`,
               animationDelay: `${Math.min(i * 0.04, 0.6)}s`,
             }}
             onMouseEnter={e => { e.currentTarget.style.borderColor = pillarAccentCSS; e.currentTarget.style.background = P.surface; e.currentTarget.style.boxShadow = `0 0 20px rgba(${sessionPillarUI.fire[0]}, ${sessionPillarUI.fire[1]}, ${sessionPillarUI.fire[2]}, 0.08)`; }}
@@ -1794,7 +1853,7 @@ export default function Renew() {
         fontFamily: FONT,
       }}>
         <div style={{
-          animation: "renewFadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) both",
+          animation: "renewFadeInUp 0.9s cubic-bezier(0.22, 1, 0.36, 1) both",
           animationDelay: "0.1s", textAlign: "center",
         }}>
           <div style={labelStyle}>Session complete</div>
@@ -1808,7 +1867,7 @@ export default function Renew() {
 
         {/* Time spoken this session */}
         <div style={{
-          animation: "renewCountUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both",
+          animation: "renewCountUp 1s cubic-bezier(0.22, 1, 0.36, 1) both",
           animationDelay: "0.3s", textAlign: "center",
         }}>
           <div style={{ color: P.white, fontSize: 30, fontWeight: 200, fontFamily: FONT, letterSpacing: 3, marginBottom: 4 }}>
@@ -1820,7 +1879,7 @@ export default function Renew() {
         {/* Growth this session — staggered reveal */}
         <div style={{
           ...card, padding: "16px 20px", marginBottom: 20, width: "100%", maxWidth: 300,
-          animation: "renewFadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) both",
+          animation: "renewFadeInUp 0.9s cubic-bezier(0.22, 1, 0.36, 1) both",
           animationDelay: "0.5s",
         }}>
           <div style={{ ...labelStyle, marginBottom: 12 }}>This session</div>
@@ -1828,7 +1887,7 @@ export default function Renew() {
             {growthItems.map((item, idx) => (
               <div key={idx} style={{
                 display: "flex", justifyContent: "space-between", alignItems: "center",
-                animation: "renewStaggerIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both",
+                animation: "renewStaggerIn 0.7s cubic-bezier(0.22, 1, 0.36, 1) both",
                 animationDelay: `${0.7 + idx * 0.12}s`,
               }}>
                 <span style={{ color: P.textSoft, fontSize: 11, fontFamily: FONT_BODY }}>{item.label}</span>
@@ -1847,7 +1906,7 @@ export default function Renew() {
         <div style={{
           ...card, padding: "12px 20px", marginBottom: 24, width: "100%", maxWidth: 300,
           borderColor: "rgba(251,146,60,0.15)", background: P.surface,
-          animation: "renewFadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) both",
+          animation: "renewFadeInUp 0.9s cubic-bezier(0.22, 1, 0.36, 1) both",
           animationDelay: "0.8s",
         }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -1863,7 +1922,7 @@ export default function Renew() {
         </div>
 
         <div style={{
-          animation: "renewFadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) both",
+          animation: "renewFadeInUp 0.9s cubic-bezier(0.22, 1, 0.36, 1) both",
           animationDelay: "1s", display: "flex", flexDirection: "column", alignItems: "center",
         }}>
           <button className="renew-btn-tap" onClick={() => { setSelectedPassage(null); setScreen(selectedCategory ? "pick-passage" : "home"); }} style={btnMain}>
@@ -1905,7 +1964,7 @@ export default function Renew() {
         ].map((s, i) => (
           <div key={i} style={{
             ...card, padding: "12px 6px", flex: 1, textAlign: "center",
-            animation: `renewStaggerIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both`,
+            animation: `renewStaggerIn 0.7s cubic-bezier(0.22, 1, 0.36, 1) both`,
             animationDelay: `${i * 0.08}s`,
           }}>
             <div style={{ ...statNum(s.color), fontSize: 16 }}>{s.value}</div>
