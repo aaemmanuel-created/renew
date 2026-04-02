@@ -4,10 +4,10 @@ import { auth, googleProvider, db } from "./firebase";
 import { onAuthStateChanged, signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 
-// Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Neural Network Simulation Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ
-// Joshua 1:8 Ã¢ÂÂ "This Book of the Law shall not depart from your mouth..."
+// ─── Neural Network Simulation ───
+// Joshua 1:8 — "This Book of the Law shall not depart from your mouth..."
 
-// Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Load JetBrains Mono + Inter Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ
+// ─── Load JetBrains Mono + Inter ───
 const fontLink = document.createElement("link");
 fontLink.href = "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@200;300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap";
 fontLink.rel = "stylesheet";
@@ -18,14 +18,14 @@ if (!document.head.querySelector('link[href*="JetBrains+Mono"]')) {
 const FONT = "'JetBrains Mono', monospace";
 const FONT_BODY = "'Inter', -apple-system, sans-serif"; // For scripture text & body copy
 
-// Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Inject CSS Keyframe Animations Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ
+// ─── Inject CSS Keyframe Animations ───
 const STYLE_ID = "renew-keyframes";
 if (!document.getElementById(STYLE_ID)) {
   const styleEl = document.createElement("style");
   styleEl.id = STYLE_ID;
   styleEl.textContent = `
-    /* Ã¢ÂÂÃ¢ÂÂ Silk-smooth easing curves Ã¢ÂÂÃ¢ÂÂ */
-    /* Soft deceleration Ã¢ÂÂ like settling into place */
+    /* ── Silk-smooth easing curves ── */
+    /* Soft deceleration — like settling into place */
     /* cubic-bezier(0.22, 1, 0.36, 1) = smooth overshoot-free ease-out */
     /* cubic-bezier(0.0, 0, 0.2, 1)  = Material-style decelerate */
 
@@ -142,12 +142,12 @@ if (!document.getElementById(STYLE_ID)) {
         filter: blur(0px);
       }
     }
-    /* v2: Divider shimmer Ã¢ÂÂ light catching a wire */
+    /* v2: Divider shimmer — light catching a wire */
     @keyframes renewDividerShimmer {
       0% { background-position: -100px 0; }
       100% { background-position: 100px 0; }
     }
-    /* v2: Achievement flash Ã¢ÂÂ stat glow on reveal */
+    /* v2: Achievement flash — stat glow on reveal */
     @keyframes renewAchievementFlash {
       0% {
         opacity: 0;
@@ -233,7 +233,7 @@ if (!document.getElementById(STYLE_ID)) {
       pointer-events: none;
       z-index: 1;
     }
-    /* Button tap feedback Ã¢ÂÂ silk-smooth */
+    /* Button tap feedback — silk-smooth */
     .renew-btn-tap {
       transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.4s ease, opacity 0.3s ease;
       will-change: transform;
@@ -241,11 +241,11 @@ if (!document.getElementById(STYLE_ID)) {
     .renew-btn-tap:active { transform: scale(0.96) !important; }
     /* Smooth scrolling for passage lists */
     .renew-smooth-scroll { scroll-behavior: smooth; -webkit-overflow-scrolling: touch; }
-    /* Screen transitions Ã¢ÂÂ silk float-in */
+    /* Screen transitions — silk float-in */
     .renew-screen-enter {
       animation: renewScreenEnter 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
     }
-    /* Splash exit and login enter transitions */
+    /* Splash → Login transition animations */
     @keyframes renewSplashExit {
       0% { opacity: 1; transform: scale(1); filter: blur(0px); }
       100% { opacity: 0; transform: scale(1.05); filter: blur(20px); }
@@ -258,7 +258,7 @@ if (!document.getElementById(STYLE_ID)) {
   document.head.appendChild(styleEl);
 }
 
-// Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Palette: pure black + cool accents Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ
+// ─── Palette: pure black + cool accents ───
 const P = {
   black: "#000000",
   bg: "#000000",
@@ -291,7 +291,7 @@ const P = {
   danger: "#EF4444",
 };
 
-// Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Pillar Color Palettes Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ
+// ─── Pillar Color Palettes ───
 // Each pillar has a distinct color temperature for neural network rendering
 // PERSON = rose-violet (warm), VEHICLE = blue-indigo (cool), ASSIGNMENT = white-gold (bright)
 const PILLAR_COLORS = {
@@ -341,7 +341,7 @@ function getPillarColors(pillar) {
   return PILLAR_COLORS[pillar] || PILLAR_COLORS.DEFAULT;
 }
 
-// Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Performance: pre-computed RGBA prefix strings per palette Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ
+// ─── Performance: pre-computed RGBA prefix strings per palette ───
 // Avoids thousands of template literal allocations per frame.
 // Usage: `${pc.fogRGB}${alpha})` instead of `rgba(${pc.fog[0]}, ${pc.fog[1]}, ${pc.fog[2]}, ${alpha})`
 const PILLAR_CACHE = {};
@@ -360,9 +360,9 @@ function getPillarCached(pillar) {
   return cached;
 }
 
-// Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Scripture Library Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ
+// ─── Scripture Library ───
 // Three pillars: Person (who you are), Vehicle (how you move), Assignment (what you're called to)
-// Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Scripture Library Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ
+// ─── Scripture Library ───
 // Translation: English Standard Version (ESV)
 // Three pillars: Person (who you are), Vehicle (how you move), Assignment (what you're called to)
 // All passages arranged in canonical Bible order within each pillar
@@ -374,7 +374,7 @@ const SCRIPTURE_CATEGORIES = [
     subtitle: "this is you",
     icon: "\u{1FA9E}",
     passages: [
-      // Ã¢ÂÂÃ¢ÂÂ Psalms Ã¢ÂÂ identity, soul, worship, inner life Ã¢ÂÂÃ¢ÂÂ
+      // ── Psalms — identity, soul, worship, inner life ──
       { ref: "Psalm 1:1-3", text: "Blessed is the man who walks not in the counsel of the wicked, nor stands in the way of sinners, nor sits in the seat of scoffers; but his delight is in the law of the Lord, and on his law he meditates day and night. He is like a tree planted by streams of water that yields its fruit in its season, and its leaf does not wither. In all that he does, he prospers." },
       { ref: "Psalm 8:4-6", text: "What is man that you are mindful of him, and the son of man that you care for him? Yet you have made him a little lower than the heavenly beings and crowned him with glory and honor. You have given him dominion over the works of your hands; you have put all things under his feet." },
       { ref: "Psalm 16:11", text: "You make known to me the path of life; in your presence there is fullness of joy; at your right hand are pleasures forevermore." },
@@ -396,7 +396,7 @@ const SCRIPTURE_CATEGORIES = [
       { ref: "Psalm 139:23-24", text: "Search me, O God, and know my heart! Try me and know my thoughts! And see if there be any grievous way in me, and lead me in the way everlasting!" },
       { ref: "Psalm 143:8", text: "Let me hear in the morning of your steadfast love, for in you I trust. Make me know the way I should go, for to you I lift up my soul." },
       { ref: "Psalm 146:1-2", text: "Praise the Lord! Praise the Lord, O my soul! I will praise the Lord as long as I live; I will sing praises to my God while I have my being." },
-      // Ã¢ÂÂÃ¢ÂÂ Proverbs Ã¢ÂÂ heart, character, wisdom, inner man Ã¢ÂÂÃ¢ÂÂ
+      // ── Proverbs — heart, character, wisdom, inner man ──
       { ref: "Proverbs 2:6-7", text: "For the Lord gives wisdom; from his mouth come knowledge and understanding; he stores up sound wisdom for the upright; he is a shield to those who walk in integrity." },
       { ref: "Proverbs 3:1-2", text: "My son, do not forget my teaching, but let your heart keep my commandments, for length of days and years of life and peace they will add to you." },
       { ref: "Proverbs 3:13-15", text: "Blessed is the one who finds wisdom, and the one who gets understanding, for the gain from her is better than gain from silver and her profit better than gold. She is more precious than jewels, and nothing you desire can compare with her." },
@@ -409,7 +409,7 @@ const SCRIPTURE_CATEGORIES = [
       { ref: "Proverbs 20:27", text: "The spirit of man is the lamp of the Lord, searching all his innermost parts." },
       { ref: "Proverbs 23:7", text: "For as he thinks in his heart, so is he." },
       { ref: "Proverbs 25:28", text: "A man without self-control is like a city broken into and left without walls." },
-      // Ã¢ÂÂÃ¢ÂÂ Prophets Ã¢ÂÂÃ¢ÂÂ
+      // ── Prophets ──
       { ref: "Isaiah 26:3", text: "You keep him in perfect peace whose mind is stayed on you, because he trusts in you." },
       { ref: "Isaiah 26:7", text: "The path of the righteous is level; you make level the way of the righteous." },
       { ref: "Isaiah 43:1", text: "But now thus says the Lord, he who created you, O Jacob, he who formed you, O Israel: Fear not, for I have redeemed you; I have called you by name, you are mine." },
@@ -418,12 +418,12 @@ const SCRIPTURE_CATEGORIES = [
       { ref: "Jeremiah 1:5", text: "Before I formed you in the womb I knew you, and before you were born I consecrated you; I appointed you a prophet to the nations." },
       { ref: "Jeremiah 17:7-8", text: "Blessed is the man who trusts in the Lord, whose trust is the Lord. He is like a tree planted by water, that sends out its roots by the stream, and does not fear when heat comes, for its leaves remain green, and is not anxious in the year of drought, for it does not cease to bear fruit." },
       { ref: "Ezekiel 36:26", text: "And I will give you a new heart, and a new spirit I will put within you. And I will remove the heart of stone from your flesh and give you a heart of flesh." },
-      // Ã¢ÂÂÃ¢ÂÂ Gospels Ã¢ÂÂÃ¢ÂÂ
+      // ── Gospels ──
       { ref: "John 1:12", text: "But to all who did receive him, who believed in his name, he gave the right to become children of God." },
       { ref: "John 4:24", text: "God is spirit, and those who worship him must worship in spirit and truth." },
       { ref: "John 10:10", text: "The thief comes only to steal and kill and destroy. I came that they may have life and have it abundantly." },
       { ref: "John 15:5", text: "I am the vine; you are the branches. Whoever abides in me and I in him, he it is that bears much fruit, for apart from me you can do nothing." },
-      // Ã¢ÂÂÃ¢ÂÂ Epistles Ã¢ÂÂÃ¢ÂÂ
+      // ── Epistles ──
       { ref: "Romans 5:8", text: "But God shows his love for us in that while we were still sinners, Christ died for us." },
       { ref: "Romans 8:1", text: "There is therefore now no condemnation for those who are in Christ Jesus." },
       { ref: "Romans 8:16-17", text: "The Spirit himself bears witness with our spirit that we are children of God, and if children, then heirs -- heirs of God and fellow heirs with Christ, provided we suffer with him in order that we may also be glorified with him." },
@@ -452,13 +452,13 @@ const SCRIPTURE_CATEGORIES = [
     subtitle: "this is the structure God gives",
     icon: "\u{1F54A}\u{FE0F}",
     passages: [
-      // Ã¢ÂÂÃ¢ÂÂ Torah Ã¢ÂÂ covenant foundations of provision Ã¢ÂÂÃ¢ÂÂ
+      // ── Torah — covenant foundations of provision ──
       { ref: "Genesis 12:2-3", text: "And I will make of you a great nation, and I will bless you and make your name great, so that you will be a blessing. I will bless those who bless you, and him who dishonors you I will curse, and in you all the families of the earth shall be blessed." },
       { ref: "Genesis 22:14", text: "So Abraham called the name of that place, The Lord will provide; as it is said to this day, On the mount of the Lord it shall be provided." },
       { ref: "Deuteronomy 8:18", text: "You shall remember the Lord your God, for it is he who gives you power to get wealth, that he may confirm his covenant that he swore to your fathers, as it is this day." },
       { ref: "Deuteronomy 28:1-2", text: "And if you faithfully obey the voice of the Lord your God, being careful to do all his commandments that I command you today, the Lord your God will set you high above all the nations of the earth. And all these blessings shall come upon you and overtake you, if you obey the voice of the Lord your God." },
       { ref: "Deuteronomy 28:12-13", text: "The Lord will open to you his good treasury, the heavens, to give the rain to your land in its season and to bless all the work of your hands. And you shall lend to many nations, but you shall not borrow. And the Lord will make you the head and not the tail, and you shall only go up and not down." },
-      // Ã¢ÂÂÃ¢ÂÂ Psalms Ã¢ÂÂ provision, blessing, favour, structure Ã¢ÂÂÃ¢ÂÂ
+      // ── Psalms — provision, blessing, favour, structure ──
       { ref: "Psalm 1:1-3", text: "Blessed is the man who walks not in the counsel of the wicked, nor stands in the way of sinners, nor sits in the seat of scoffers; but his delight is in the law of the Lord, and on his law he meditates day and night. He is like a tree planted by streams of water that yields its fruit in its season, and its leaf does not wither. In all that he does, he prospers." },
       { ref: "Psalm 23:1-6", text: "The Lord is my shepherd; I shall not want. He makes me lie down in green pastures. He leads me beside still waters. He restores my soul. He leads me in paths of righteousness for his name's sake. Even though I walk through the valley of the shadow of death, I will fear no evil, for you are with me; your rod and your staff, they comfort me. You prepare a table before me in the presence of my enemies; you anoint my head with oil; my cup overflows. Surely goodness and mercy shall follow me all the days of my life, and I shall dwell in the house of the Lord forever." },
       { ref: "Psalm 24:1", text: "The earth is the Lord's and the fullness thereof, the world and those who dwell therein." },
@@ -475,7 +475,7 @@ const SCRIPTURE_CATEGORIES = [
       { ref: "Psalm 127:1", text: "Unless the Lord builds the house, those who build it labor in vain. Unless the Lord watches over the city, the watchman stays awake in vain." },
       { ref: "Psalm 128:1-4", text: "Blessed is everyone who fears the Lord, who walks in his ways! You shall eat the fruit of the labor of your hands; you shall be blessed, and it shall be well with you. Your wife will be like a fruitful vine within your house; your children will be like olive shoots around your table. Behold, thus shall the man be blessed who fears the Lord." },
       { ref: "Psalm 145:15-16", text: "The eyes of all look to you, and you give them their food in due season. You open your hand; you satisfy the desire of every living thing." },
-      // Ã¢ÂÂÃ¢ÂÂ Proverbs Ã¢ÂÂ wisdom, diligence, wealth, stewardship, counsel Ã¢ÂÂÃ¢ÂÂ
+      // ── Proverbs — wisdom, diligence, wealth, stewardship, counsel ──
       { ref: "Proverbs 3:5-6", text: "Trust in the Lord with all your heart, and do not lean on your own understanding. In all your ways acknowledge him, and he will make straight your paths." },
       { ref: "Proverbs 3:9-10", text: "Honor the Lord with your wealth and with the firstfruits of all your produce; then your barns will be filled with plenty, and your vats will be bursting with wine." },
       { ref: "Proverbs 8:12", text: "I, wisdom, dwell with prudence, and I find knowledge and discretion." },
@@ -492,7 +492,7 @@ const SCRIPTURE_CATEGORIES = [
       { ref: "Proverbs 24:3-4", text: "By wisdom a house is built, and by understanding it is established; by knowledge the rooms are filled with all precious and pleasant riches." },
       { ref: "Proverbs 27:23-24", text: "Know well the condition of your flocks, and give attention to your herds, for riches do not last forever; and does a crown endure to all generations?" },
       { ref: "Proverbs 29:2", text: "When the righteous increase, the people rejoice, but when the wicked rule, the people groan." },
-      // Ã¢ÂÂÃ¢ÂÂ Prophets Ã¢ÂÂ nations bringing resources, divine economy, government Ã¢ÂÂÃ¢ÂÂ
+      // ── Prophets — nations bringing resources, divine economy, government ──
       { ref: "Isaiah 2:2-3", text: "It shall come to pass in the latter days that the mountain of the house of the Lord shall be established as the highest of the mountains, and shall be lifted up above the hills; and all the nations shall flow to it, and many peoples shall come, and say: Come, let us go up to the mountain of the Lord, to the house of the God of Jacob, that he may teach us his ways and that we may walk in his paths." },
       { ref: "Isaiah 9:6-7", text: "For to us a child is born, to us a son is given; and the government shall be upon his shoulder, and his name shall be called Wonderful Counselor, Mighty God, Everlasting Father, Prince of Peace. Of the increase of his government and of peace there will be no end." },
       { ref: "Isaiah 40:31", text: "But they who wait for the Lord shall renew their strength; they shall mount up with wings like eagles; they shall run and not be weary; they shall walk and not faint." },
@@ -504,10 +504,10 @@ const SCRIPTURE_CATEGORIES = [
       { ref: "Haggai 2:7-8", text: "And I will shake all nations, so that the treasures of all nations shall come in, and I will fill this house with glory, says the Lord of hosts. The silver is mine, and the gold is mine, declares the Lord of hosts." },
       { ref: "Habakkuk 2:2", text: "And the Lord answered me: Write the vision; make it plain on tablets, so he may run who reads it." },
       { ref: "Malachi 3:10-11", text: "Bring the full tithe into the storehouse, that there may be food in my house. And thereby put me to the test, says the Lord of hosts, if I will not open the windows of heaven for you and pour down for you a blessing until there is no more need. I will rebuke the devourer for you, so that it will not destroy the fruits of your soil, and your vine in the field shall not fail to bear, says the Lord of hosts." },
-      // Ã¢ÂÂÃ¢ÂÂ Gospels & Acts Ã¢ÂÂÃ¢ÂÂ
+      // ── Gospels & Acts ──
       { ref: "Matthew 6:33", text: "But seek first the kingdom of God and his righteousness, and all these things will be added to you." },
       { ref: "Luke 6:38", text: "Give, and it will be given to you. Good measure, pressed down, shaken together, running over, will be put into your lap. For with the measure you use it will be measured back to you." },
-      // Ã¢ÂÂÃ¢ÂÂ Epistles Ã¢ÂÂÃ¢ÂÂ
+      // ── Epistles ──
       { ref: "Romans 8:28", text: "And we know that for those who love God all things work together for good, for those who are called according to his purpose." },
       { ref: "Romans 13:1", text: "Let every person be subject to the governing authorities. For there is no authority except from God, and those that exist have been instituted by God." },
       { ref: "1 Corinthians 14:40", text: "But all things should be done decently and in order." },
@@ -523,18 +523,18 @@ const SCRIPTURE_CATEGORIES = [
     subtitle: "this is the mission God gives",
     icon: "\u{1F525}",
     passages: [
-      // Ã¢ÂÂÃ¢ÂÂ Torah Ã¢ÂÂ courage and obedience Ã¢ÂÂÃ¢ÂÂ
+      // ── Torah — courage and obedience ──
       { ref: "Genesis 1:28", text: "And God blessed them. And God said to them, Be fruitful and multiply and fill the earth and subdue it, and have dominion over the fish of the sea and over the birds of the heavens and over every living thing that moves on the earth." },
       { ref: "Deuteronomy 28:13", text: "And the Lord will make you the head and not the tail, and you shall only go up and not down, if you obey the commandments of the Lord your God, which I command you today, being careful to do them." },
       { ref: "Deuteronomy 31:6", text: "Be strong and courageous. Do not fear or be in dread of them, for it is the Lord your God who goes with you. He will not leave you or forsake you." },
       { ref: "Deuteronomy 31:8", text: "It is the Lord who goes before you. He will be with you; he will not leave you or forsake you. Do not fear or be dismayed." },
-      // Ã¢ÂÂÃ¢ÂÂ History Ã¢ÂÂÃ¢ÂÂ
+      // ── History ──
       { ref: "Joshua 1:8-9", text: "This Book of the Law shall not depart from your mouth, but you shall meditate on it day and night, so that you may be careful to do according to all that is written in it. For then you will make your way prosperous, and then you will have good success. Have I not commanded you? Be strong and courageous. Do not be frightened, and do not be dismayed, for the Lord your God is with you wherever you go." },
       { ref: "1 Samuel 17:47", text: "And that all this assembly may know that the Lord saves not with sword and spear. For the battle is the Lord's, and he will give you into our hand." },
       { ref: "1 Chronicles 4:10", text: "Jabez called upon the God of Israel, saying, Oh that you would bless me and enlarge my border, and that your hand might be with me, and that you would keep me from harm so that it might not bring me pain! And God granted what he asked." },
       { ref: "2 Chronicles 20:15", text: "And he said, Listen, all Judah and inhabitants of Jerusalem and King Jehoshaphat: Thus says the Lord to you, Do not be afraid and do not be dismayed at this great horde, for the battle is not yours but God's." },
       { ref: "Esther 4:14", text: "For if you keep silent at this time, relief and deliverance will rise for the Jews from another place, but you and your father's house will perish. And who knows whether you have not come to the kingdom for such a time as this?" },
-      // Ã¢ÂÂÃ¢ÂÂ Psalms Ã¢ÂÂ guidance, purpose, times, boldness Ã¢ÂÂÃ¢ÂÂ
+      // ── Psalms — guidance, purpose, times, boldness ──
       { ref: "Psalm 2:8", text: "Ask of me, and I will make the nations your heritage, and the ends of the earth your possession." },
       { ref: "Psalm 5:12", text: "For you bless the righteous, O Lord; you cover him with favor as with a shield." },
       { ref: "Psalm 18:29", text: "For by you I can run against a troop, and by my God I can leap over a wall." },
@@ -549,7 +549,7 @@ const SCRIPTURE_CATEGORIES = [
       { ref: "Psalm 110:1-3", text: "The Lord says to my Lord: Sit at my right hand, until I make your enemies your footstool. The Lord sends forth from Zion your mighty scepter. Rule in the midst of your enemies! Your people will offer themselves freely on the day of your power, in holy garments; from the womb of the morning, the dew of your youth will be yours." },
       { ref: "Psalm 126:5-6", text: "Those who sow in tears shall reap with shouts of joy! He who goes out weeping, bearing the seed for sowing, shall come home with shouts of joy, bringing his sheaves with him." },
       { ref: "Psalm 138:8", text: "The Lord will fulfill his purpose for me; your steadfast love, O Lord, endures forever. Do not forsake the work of your hands." },
-      // Ã¢ÂÂÃ¢ÂÂ Proverbs Ã¢ÂÂ diligence, calling, purpose, leadership Ã¢ÂÂÃ¢ÂÂ
+      // ── Proverbs — diligence, calling, purpose, leadership ──
       { ref: "Proverbs 3:27", text: "Do not withhold good from those to whom it is due, when it is in your power to do it." },
       { ref: "Proverbs 11:30", text: "The fruit of the righteous is a tree of life, and whoever captures souls is wise." },
       { ref: "Proverbs 14:23", text: "In all toil there is profit, but mere talk tends only to poverty." },
@@ -559,7 +559,7 @@ const SCRIPTURE_CATEGORIES = [
       { ref: "Proverbs 19:21", text: "Many are the plans in the mind of a man, but it is the purpose of the Lord that will stand." },
       { ref: "Proverbs 22:29", text: "Do you see a man skillful in his work? He will stand before kings; he will not stand before obscure men." },
       { ref: "Proverbs 29:18", text: "Where there is no prophetic vision the people cast off restraint, but blessed is he who keeps the law." },
-      // Ã¢ÂÂÃ¢ÂÂ Prophets Ã¢ÂÂ mission, calling, times, nations Ã¢ÂÂÃ¢ÂÂ
+      // ── Prophets — mission, calling, times, nations ──
       { ref: "Ecclesiastes 3:1", text: "For everything there is a season, and a time for every matter under heaven." },
       { ref: "Ecclesiastes 3:11", text: "He has made everything beautiful in its time. Also, he has put eternity into man's heart, yet so that he cannot find out what God has done from the beginning to the end." },
       { ref: "Ecclesiastes 9:10", text: "Whatever your hand finds to do, do it with your might, for there is no work or thought or knowledge or wisdom in Sheol, to which you are going." },
@@ -573,13 +573,13 @@ const SCRIPTURE_CATEGORIES = [
       { ref: "Habakkuk 2:3", text: "For still the vision awaits its appointed time; it hastens to the end -- it will not lie. If it seems slow, wait for it; it will surely come; it will not delay." },
       { ref: "Micah 6:8", text: "He has told you, O man, what is good; and what does the Lord require of you but to do justice, and to love kindness, and to walk humbly with your God?" },
       { ref: "Zechariah 4:6", text: "Then he said to me, This is the word of the Lord to Zerubbabel: Not by might, nor by power, but by my Spirit, says the Lord of hosts." },
-      // Ã¢ÂÂÃ¢ÂÂ Gospels Ã¢ÂÂÃ¢ÂÂ
+      // ── Gospels ──
       { ref: "Matthew 5:14-16", text: "You are the light of the world. A city set on a hill cannot be hidden. Nor do people light a lamp and put it under a basket, but on a stand, and it gives light to all in the house. In the same way, let your light shine before others, so that they may see your good works and give glory to your Father who is in heaven." },
       { ref: "Matthew 28:18-20", text: "And Jesus came and said to them, All authority in heaven and on earth has been given to me. Go therefore and make disciples of all nations, baptizing them in the name of the Father and of the Son and of the Holy Spirit, teaching them to observe all that I have commanded you. And behold, I am with you always, to the end of the age." },
       { ref: "Mark 16:15", text: "And he said to them, Go into all the world and proclaim the gospel to the whole creation." },
       { ref: "Luke 4:18-19", text: "The Spirit of the Lord is upon me, because he has anointed me to proclaim good news to the poor. He has sent me to proclaim liberty to the captives and recovering of sight to the blind, to set at liberty those who are oppressed, to proclaim the year of the Lord's favor." },
       { ref: "John 15:16", text: "You did not choose me, but I chose you and appointed you that you should go and bear fruit and that your fruit should abide, so that whatever you ask the Father in my name, he may give it to you." },
-      // Ã¢ÂÂÃ¢ÂÂ Epistles Ã¢ÂÂÃ¢ÂÂ
+      // ── Epistles ──
       { ref: "Acts 1:8", text: "But you will receive power when the Holy Spirit has come upon you, and you will be my witnesses in Jerusalem and in all Judea and Samaria, and to the end of the earth." },
       { ref: "Acts 17:26-27", text: "And he made from one man every nation of mankind to live on all the face of the earth, having determined allotted periods and the boundaries of their dwelling place, that they should seek God, and perhaps feel their way toward him and find him." },
       { ref: "Romans 8:28", text: "And we know that for those who love God all things work together for good, for those who are called according to his purpose." },
@@ -595,7 +595,7 @@ const SCRIPTURE_CATEGORIES = [
   },
 ];
 
-// Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Neuron / Synapse Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ
+// ─── Neuron / Synapse ───
 class Neuron {
   constructor(x, y, id, pillar) {
     this.id = id; this.x = x; this.y = y;
@@ -605,12 +605,12 @@ class Neuron {
     this.radius = 5 + Math.random() * 4; // larger soma like microscopy
     this.energy = 0.15; this.fireLevel = 0; this.totalFired = 0;
     this.connections = []; this.pulsePhase = Math.random() * Math.PI * 2; this.maturity = 0;
-    // Irregular cell body shape Ã¢ÂÂ 10 vertices with noise for organic soma
+    // Irregular cell body shape — 10 vertices with noise for organic soma
     this.bodyShape = Array.from({length: 10}, (_, i) => ({
       angle: (i / 10) * Math.PI * 2 + (Math.random() - 0.5) * 0.2,
       r: 0.7 + Math.random() * 0.6, // radius multiplier 0.7-1.3
     }));
-    // Radiating neurites Ã¢ÂÂ starburst pattern like real microscopy
+    // Radiating neurites — starburst pattern like real microscopy
     // One axon (longest) + many shorter dendrites
     const numNeurites = 8 + Math.floor(Math.random() * 7); // 8-14 radiating arms
     const axonIdx = Math.floor(Math.random() * numNeurites);
@@ -625,7 +625,7 @@ class Neuron {
         : 20 + Math.random() * 55;  // dendrites: 20-75px
       const curve1 = (Math.random() - 0.5) * 25;
       const curve2 = (Math.random() - 0.5) * 18;
-      // Sub-branches Ã¢ÂÂ axon gets more, dendrites sometimes branch
+      // Sub-branches — axon gets more, dendrites sometimes branch
       const numBranches = isAxon
         ? 1 + Math.floor(Math.random() * 3)   // axon: 1-3 branches
         : (Math.random() < 0.45 ? 1 + Math.floor(Math.random() * 2) : 0);
@@ -635,7 +635,7 @@ class Neuron {
         length: 10 + Math.random() * 30,
         curve: (Math.random() - 0.5) * 18,
       }));
-      // Growth cone at tip Ã¢ÂÂ small bulb for "reaching" effect
+      // Growth cone at tip — small bulb for "reaching" effect
       const growthCone = {
         size: isAxon ? 1.2 + Math.random() * 1.0 : 0.6 + Math.random() * 0.8,
         filopodia: Array.from({length: 2 + Math.floor(Math.random() * 3)}, () => ({
@@ -662,13 +662,13 @@ class Synapse {
     this.id = id; this.from = fromId; this.to = toId;
     this.strength = 0.02; this.activity = 0; this.pulsePos = -1;
     this.totalPulses = 0; this.width = 0.4;
-    // Curved organic synapse Ã¢ÂÂ bezier control point offset
+    // Curved organic synapse — bezier control point offset
     this.cx = (Math.random() - 0.5) * 60;
     this.cy = (Math.random() - 0.5) * 60;
     // Taper: width multiplier at start vs end
     this.taperStart = 0.8 + Math.random() * 0.6; // thicker near soma
     this.taperEnd = 0.15 + Math.random() * 0.25;  // thinner at endpoint
-    // Animated connection formation Ã¢ÂÂ "reaching moment"
+    // Animated connection formation — "reaching moment"
     this.forming = true;     // synapse is still growing/reaching
     this.formProgress = 0;   // 0 to 1 animation progress
   }
@@ -677,12 +677,12 @@ class Synapse {
 function createInitialState(w, h, pillar) {
   const n = new Neuron(w / 2, h / 2, 0, pillar);
   n.energy = 0.85; n.maturity = 1; n.radius = 8;
-  // Start as a bare cell Ã¢ÂÂ no dendrites yet. They grow as you speak.
+  // Start as a bare cell — no dendrites yet. They grow as you speak.
   n.dendrites = [];
   return { neurons: [n], synapses: [], nextId: 1, totalSpeakTime: 0, sessionFires: 0 };
 }
 
-// Grow a new dendrite on a neuron Ã¢ÂÂ called gradually during speaking
+// Grow a new dendrite on a neuron — called gradually during speaking
 function growDendrite(neuron) {
   const existing = neuron.dendrites.length;
   const maxDendrites = 10 + Math.floor(Math.random() * 5); // cap at 10-14
@@ -734,7 +734,7 @@ function growDendrite(neuron) {
 }
 function dst(a, b) { return Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2); }
 
-// Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Bezier helper (outside render loop to avoid per-frame closure allocation) Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ
+// ─── Bezier helper (outside render loop to avoid per-frame closure allocation) ───
 function bezPt(p0x, p0y, cpx, cpy, p1x, p1y, t) {
   const mt = 1 - t;
   return [mt * mt * p0x + 2 * mt * t * cpx + t * t * p1x, mt * mt * p0y + 2 * mt * t * cpy + t * t * p1y];
@@ -749,7 +749,7 @@ function addNeuron(state, w, h, pillar) {
     Math.max(35, Math.min(w - 35, parent.x + Math.cos(ang) * d)),
     Math.max(75, Math.min(h - 95, parent.y + Math.sin(ang) * d)), id, pillar
   );
-  neuron.dendrites = []; // Start bare Ã¢ÂÂ dendrites grow organically as you speak
+  neuron.dendrites = []; // Start bare — dendrites grow organically as you speak
   state.neurons.push(neuron);
   const sId = state.nextId++;
   state.synapses.push(new Synapse(parent.id, neuron.id, sId));
@@ -783,7 +783,7 @@ function fireNeuron(state, neuron, sMap) {
 function fmtTime(s) { const m = Math.floor(s / 60); const sec = s % 60; return m > 0 ? `${m}m ${sec}s` : `${sec}s`; }
 function fmtShort(s) { if (s < 60) return `${s}s`; if (s < 3600) return `${Math.floor(s / 60)}m`; return `${(s / 3600).toFixed(1)}h`; }
 
-// Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Component Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ
+// ─── Component ───
 export default function Renew() {
   const canvasRef = useRef(null);
   const stateRef = useRef(null);
@@ -814,7 +814,7 @@ export default function Renew() {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [permissionDenied, setPermissionDenied] = useState(false);
 
-  // Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Authentication Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ
+  // ─── Authentication ───
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [authScreen, setAuthScreen] = useState("login"); // "login" | "signup"
@@ -836,8 +836,8 @@ export default function Renew() {
     return unsub;
   }, []);
 
-  // Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Per-passage persistent neural networks Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ
-  // Map: passage ref string Ã¢ÂÂ { neurons: [...serialized], synapses: [...serialized], nextId, totalSpeakTime }
+  // ─── Per-passage persistent neural networks ───
+  // Map: passage ref string → { neurons: [...serialized], synapses: [...serialized], nextId, totalSpeakTime }
   const passageNetworksRef = useRef({});
 
   const [sessionHistory, setSessionHistory] = useState([]);
@@ -849,7 +849,7 @@ export default function Renew() {
   // Helper: check if first time (no sessions and no lifetime data)
   const isFirstTime = sessionHistory.length === 0 && lifetimeSeconds === 0;
 
-  // Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Cloud Sync: Load data from Firestore on login Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ
+  // ─── Cloud Sync: Load data from Firestore on login ───
   useEffect(() => {
     if (!user || dataLoadedRef.current) return;
     const loadCloud = async () => {
@@ -873,7 +873,7 @@ export default function Renew() {
     loadCloud();
   }, [user]);
 
-  // Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Cloud Sync: Save data to Firestore (debounced) Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ
+  // ─── Cloud Sync: Save data to Firestore (debounced) ───
   const saveToCloud = useCallback(() => {
     if (!user || !dataLoadedRef.current) return;
     // Debounce: wait 3s after last change before writing
@@ -901,7 +901,7 @@ export default function Renew() {
     saveToCloud();
   }, [sessionHistory, currentStreak, longestStreak, lifetimeSeconds, lifetimeNeurons, saveToCloud]);
 
-  // Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Auth helpers Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ
+  // ─── Auth helpers ───
   const handleGoogleSignIn = async () => {
     setAuthError(""); setAuthBusy(true);
     try { await signInWithPopup(auth, googleProvider); }
@@ -964,7 +964,7 @@ export default function Renew() {
     const key = getPassageKey(passage);
     const saved = passageNetworksRef.current[key];
     if (saved) {
-      // Restore classes from plain objects Ã¢ÂÂ pillar is preserved in saved data
+      // Restore classes from plain objects — pillar is preserved in saved data
       const st = { ...saved };
       st.neurons = saved.neurons.map(n => Object.assign(new Neuron(n.x, n.y, n.id, n.pillar), n));
       st.synapses = saved.synapses.map(s => Object.assign(new Synapse(s.from, s.to, s.id), s));
@@ -1024,7 +1024,7 @@ export default function Renew() {
     return combined;
   }, []);
 
-  // Loading state Ã¢ÂÂ brief elegant reveal
+  // Loading state — brief elegant reveal
   useEffect(() => {
     const timer = setTimeout(() => setAppLoaded(true), 600);
     return () => clearTimeout(timer);
@@ -1062,14 +1062,14 @@ export default function Renew() {
     if (!c) return;
     if (screen === "home") {
       // Home screen: show faint ambient network if passages have been spoken
-      // Always keep particles visible Ã¢ÂÂ even for first-time users the void feels alive
+      // Always keep particles visible — even for first-time users the void feels alive
       const combined = buildCombinedState(c.width, c.height);
       if (combined.neurons.length > 1) {
         // Dim the network for ambient background effect
         combined.neurons.forEach(n => { n.energy = Math.max(0.08, n.energy * 0.3); n.fireLevel = 0; });
         stateRef.current = combined;
       } else {
-        // First-time user Ã¢ÂÂ empty network but particles & fog still render
+        // First-time user — empty network but particles & fog still render
         stateRef.current = { neurons: [], synapses: [], nextId: 0, totalSpeakTime: 0, sessionFires: 0 };
       }
     } else if (screen === "summary" || screen === "history" || screen === "pick-category" || screen === "pick-passage" || screen === "custom") {
@@ -1091,7 +1091,7 @@ export default function Renew() {
       await Tone.start();
       const rev = new Tone.Reverb({ decay: 4, wet: 0.6 }).toDestination();
       const delay = new Tone.FeedbackDelay({ delayTime: "8n", feedback: 0.15, wet: 0.3 }).connect(rev);
-      // Ambient drone Ã¢ÂÂ very soft, low, continuous
+      // Ambient drone — very soft, low, continuous
       const drone = new Tone.Synth({
         oscillator: { type: "sine" },
         envelope: { attack: 2, decay: 0, sustain: 1, release: 3 },
@@ -1119,7 +1119,7 @@ export default function Renew() {
       drone.triggerAttack("C2");
       toneRef.current = { drone, fireSynth, connectSynth, spawnSynth, rev, delay };
     } catch (e) {
-      // Tone.js may not be available in preview environment Ã¢ÂÂ fail silently
+      // Tone.js may not be available in preview environment — fail silently
       toneRef.current = null;
     }
   }, []);
@@ -1184,7 +1184,7 @@ export default function Renew() {
 
   const playEndSound = useCallback(() => {
     try {
-      // Gentle descending chime Ã¢ÂÂ signals completion
+      // Gentle descending chime — signals completion
       const t = toneRef.current;
       if (t && t.fireSynth) {
         t.fireSynth.triggerAttackRelease("E5", "8n", Tone.now());
@@ -1227,7 +1227,7 @@ export default function Renew() {
     } else { setScreen(selectedCategory ? "pick-passage" : "home"); }
   }, [totalTime, neuronCount, synapseCount, selectedPassage, selectedCategory, customRef, stopListening, saveCurrentNetwork, currentStreak, longestStreak, disposeTone, playEndSound]);
 
-  // Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Swipe-back navigation Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ
+  // ─── Swipe-back navigation ───
   const goBack = useCallback(() => {
     switch (screen) {
       case "pick-category": setScreen("home"); break;
@@ -1280,7 +1280,7 @@ export default function Renew() {
     }
   }, [canSwipeBack, goBack]);
 
-  // Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Render loop Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ
+  // ─── Render loop ───
   useEffect(() => {
     const c = canvasRef.current; if (!c) return;
     const ctx = c.getContext("2d"); let run = true;
@@ -1290,7 +1290,7 @@ export default function Renew() {
       if (!st) { animRef.current = requestAnimationFrame(loop); return; }
       const now = Date.now();
 
-      // Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Performance: build O(1) lookup maps once per frame Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ
+      // ─── Performance: build O(1) lookup maps once per frame ───
       const neuronMap = new Map();
       for (const n of st.neurons) neuronMap.set(n.id, n);
       const synapseMap = new Map();
@@ -1303,7 +1303,7 @@ export default function Renew() {
       if (analyserRef.current) {
         const d = new Uint8Array(analyserRef.current.frequencyBinCount);
         analyserRef.current.getByteFrequencyData(d);
-        // Focus on speech frequencies (~85-800Hz) Ã¢ÂÂ bins 2-40 of 256 bins at 48kHz
+        // Focus on speech frequencies (~85-800Hz) — bins 2-40 of 256 bins at 48kHz
         // This ignores high-frequency noise and low rumble, giving a cleaner voice signal
         const speechStart = 2, speechEnd = Math.min(50, d.length);
         let sum = 0, peak = 0;
@@ -1319,7 +1319,7 @@ export default function Renew() {
         vol = Math.pow(vol, 0.7);
       }
       const spk = vol > 0.08;
-      // Update volume every frame for responsive waveform Ã¢ÂÂ minimal throttle
+      // Update volume every frame for responsive waveform — minimal throttle
       if (Math.abs(vol - volume) > 0.005) setVolume(vol);
       if (spk !== isSpeaking) setIsSpeaking(spk);
 
@@ -1347,7 +1347,7 @@ export default function Renew() {
         const newTime = Math.floor(st.totalSpeakTime);
         if (newTime !== totalTime) setTotalTime(newTime);
 
-        // Fire neurons Ã¢ÂÂ every 3-5 seconds, like a slow heartbeat
+        // Fire neurons — every 3-5 seconds, like a slow heartbeat
         if (now - lastFireRef.current > Math.max(3000, 5000 - vol * 2000)) {
           lastFireRef.current = now;
           fireNeuron(st, st.neurons[Math.floor(Math.random() * st.neurons.length)], synapseMap);
@@ -1359,14 +1359,14 @@ export default function Renew() {
           }
         }
 
-        // Grow dendrites on neurons Ã¢ÂÂ a new neurite sprouts every ~8-15s of speaking
+        // Grow dendrites on neurons — a new neurite sprouts every ~8-15s of speaking
         for (const neuron of st.neurons) {
           if (Math.random() < 0.001 + vol * 0.0008) { // ~once every 8-15s at normal volume
             growDendrite(neuron);
           }
         }
 
-        // Spawn new neuron Ã¢ÂÂ requires 60-120+ seconds of accumulated speaking
+        // Spawn new neuron — requires 60-120+ seconds of accumulated speaking
         const si = 60 + Math.min(st.neurons.length * 5, 60);
         if (speakAccRef.current > si && st.neurons.length < 50) {
           speakAccRef.current = 0; addNeuron(st, w, h, sessionPillar);
@@ -1392,7 +1392,7 @@ export default function Renew() {
         }
       }
 
-      // Global heartbeat rhythm Ã¢ÂÂ slow in silence, quickens with voice
+      // Global heartbeat rhythm — slow in silence, quickens with voice
       const breathSpeed = isSessionScreen && spk ? 0.03 + vol * 0.04 : 0.008;
       breathPhaseRef.current += breathSpeed;
       const breath = Math.sin(breathPhaseRef.current) * 0.5 + 0.5; // 0 to 1
@@ -1417,7 +1417,7 @@ export default function Renew() {
         n.x = Math.max(20, Math.min(w - 20, n.x));
         n.y = Math.max(60, Math.min(h - 60, n.y));
         n.fireLevel *= 0.993;
-        // Animate dendrite growth Ã¢ÂÂ slowly extend toward targetLength with unfurling curve
+        // Animate dendrite growth — slowly extend toward targetLength with unfurling curve
         for (const d of n.dendrites) {
           if (d.targetLength && d.length < d.targetLength) {
             d.length = Math.min(d.targetLength, d.length + 0.15); // slow organic extension
@@ -1434,7 +1434,7 @@ export default function Renew() {
         n.energy = Math.max(0.08, n.energy - 0.00005);
       }
       for (const s of st.synapses) {
-        // Animate synapse formation Ã¢ÂÂ "reaching moment"
+        // Animate synapse formation — "reaching moment"
         if (s.forming) {
           s.formProgress = Math.min(1, s.formProgress + 0.008); // ~2 seconds to fully form
           if (s.formProgress >= 1) {
@@ -1474,13 +1474,13 @@ export default function Renew() {
         s.activity *= 0.995;      // activity barely fades
       }
 
-      // Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ RENDER Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ
+      // ─── RENDER ───
       // Adaptive trail: ethereal ghost trails when speaking, cleaner when silent
       const trailAlpha = isSessionScreen && spk ? 0.05 : 0.12;
       ctx.fillStyle = `rgba(0, 0, 0, ${trailAlpha})`;
       ctx.fillRect(0, 0, w, h);
 
-      // Subtle depth fog gradient that breathes Ã¢ÂÂ tied to drone rhythm
+      // Subtle depth fog gradient that breathes — tied to drone rhythm
       const fogGradient = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.max(w, h) * 0.7);
       const fogOpacity = (0.025 + breath * 0.045) * (isSessionScreen && spk ? 1.2 : 0.6);
       fogGradient.addColorStop(0, `${spc.fogRGB}${fogOpacity * 0.1})`);
@@ -1489,7 +1489,7 @@ export default function Renew() {
       ctx.fillStyle = fogGradient;
       ctx.beginPath(); ctx.arc(w / 2, h / 2, Math.max(w, h), 0, Math.PI * 2); ctx.fill();
 
-      // Ambient particle system Ã¢ÂÂ persistent glowing dots
+      // Ambient particle system — persistent glowing dots
       if (particlesRef.current) {
         for (const p of particlesRef.current) {
           const pulseFade = Math.sin(p.phase) * 0.5 + 0.5;
@@ -1502,7 +1502,7 @@ export default function Renew() {
         }
       }
 
-      // Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Synapses Ã¢ÂÂ tapered, wispy, organic curves Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ
+      // ─── Synapses — tapered, wispy, organic curves ───
       for (const s of st.synapses) {
         const from = neuronMap.get(s.from), to = neuronMap.get(s.to);
         if (!from || !to) continue;
@@ -1537,7 +1537,7 @@ export default function Renew() {
           ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
         }
 
-        // If forming, draw a reaching growth cone at the tip Ã¢ÂÂ dramatic flash that settles
+        // If forming, draw a reaching growth cone at the tip — dramatic flash that settles
         if (s.forming) {
           const [tipX, tipY] = bezPt(from.x, from.y, cpx, cpy, to.x, to.y, s.formProgress);
           // Bright flash at beginning of formation, settles as it completes
@@ -1551,7 +1551,7 @@ export default function Renew() {
           ctx.fillStyle = tipGlow; ctx.beginPath(); ctx.arc(tipX, tipY, tipGlowR, 0, Math.PI * 2); ctx.fill();
         }
 
-        // Soft glow halo along high-strength synapses (skip if forming Ã¢ÂÂ no halo until complete)
+        // Soft glow halo along high-strength synapses (skip if forming — no halo until complete)
         if (s.strength > 0.3 && !s.forming) {
           ctx.strokeStyle = `${sc.softRGB}${s.strength * 0.04 + s.activity * 0.06})`;
           ctx.lineWidth = baseW * s.taperStart + 4;
@@ -1559,7 +1559,7 @@ export default function Renew() {
           ctx.beginPath(); ctx.moveTo(from.x, from.y); ctx.quadraticCurveTo(cpx, cpy, to.x, to.y); ctx.stroke();
         }
 
-        // Pulse traveling along the curve (skip if forming Ã¢ÂÂ no pulses until formed)
+        // Pulse traveling along the curve (skip if forming — no pulses until formed)
         if (s.pulsePos >= 0 && s.pulsePos <= 1 && !s.forming) {
           const [px, py] = bezPt(from.x, from.y, cpx, cpy, to.x, to.y, s.pulsePos);
           const g = ctx.createRadialGradient(px, py, 0, px, py, 14);
@@ -1571,19 +1571,19 @@ export default function Renew() {
         }
       }
 
-      // Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Neurons Ã¢ÂÂ luminous cell bodies with radiating neurites Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ
+      // ─── Neurons — luminous cell bodies with radiating neurites ───
       // Inspired by live-cell microscopy: bright soma, starburst neurites, growth cones
       for (const n of st.neurons) {
         const pc = getPillarCached(n.pillar); // per-neuron pillar palette (cached RGB strings)
         const pulse = Math.sin(n.pulsePhase) * 0.06 + 0.94;
         const r = n.radius * n.maturity * pulse, fire = n.fireLevel, energy = n.energy;
         const breathMod = 1 + breath * 0.12;
-        const lum = 0.4 + energy * 0.6; // luminosity factor Ã¢ÂÂ brighter with energy
+        const lum = 0.4 + energy * 0.6; // luminosity factor — brighter with energy
 
-        // Ã¢ÂÂÃ¢ÂÂ Neurites: radiating arms with growth cones and branches Ã¢ÂÂÃ¢ÂÂ
+        // ── Neurites: radiating arms with growth cones and branches ──
         for (const d of n.dendrites) {
           if (d.length < 0.5) continue; // skip invisible dendrites still growing
-          // Neurites are BRIGHT Ã¢ÂÂ tinted by pillar color
+          // Neurites are BRIGHT — tinted by pillar color
           const baseAlpha = (0.12 + energy * 0.2 + fire * 0.15) * n.maturity;
           const axonBoost = d.isAxon ? 1.3 : 1;
           const tipX = n.x + Math.cos(d.angle) * d.length;
@@ -1597,7 +1597,7 @@ export default function Renew() {
           ctx.lineCap = "round";
           ctx.beginPath(); ctx.moveTo(n.x, n.y); ctx.quadraticCurveTo(cp1x, cp1y, tipX, tipY); ctx.stroke();
 
-          // Main neurite Ã¢ÂÂ tapered, bright, pillar-tinted
+          // Main neurite — tapered, bright, pillar-tinted
           const dSegs = 8;
           for (let i = 0; i < dSegs; i++) {
             const t0 = i / dSegs, t1 = (i + 1) / dSegs;
@@ -1616,7 +1616,7 @@ export default function Renew() {
             ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
           }
 
-          // Growth cone at tip Ã¢ÂÂ small bright bulb with filopodia
+          // Growth cone at tip — small bright bulb with filopodia
           const gc = d.growthCone;
           const gcAlpha = baseAlpha * 0.7 * axonBoost;
           const gcR = gc.size * n.maturity;
@@ -1630,7 +1630,7 @@ export default function Renew() {
             // Growth cone body
             ctx.fillStyle = `${pc.brightRGB}${gcAlpha * 0.5})`;
             ctx.beginPath(); ctx.arc(tipX, tipY, gcR, 0, Math.PI * 2); ctx.fill();
-            // Filopodia Ã¢ÂÂ tiny hair-like extensions reaching out from the tip
+            // Filopodia — tiny hair-like extensions reaching out from the tip
             for (const fp of gc.filopodia) {
               const fpX = tipX + Math.cos(fp.angle) * fp.length * n.maturity;
               const fpY = tipY + Math.sin(fp.angle) * fp.length * n.maturity;
@@ -1669,7 +1669,7 @@ export default function Renew() {
           }
         }
 
-        // Ã¢ÂÂÃ¢ÂÂ Outer glow Ã¢ÂÂ wide, luminous, breathes Ã¢ÂÂ fluorescence microscopy style Ã¢ÂÂÃ¢ÂÂ
+        // ── Outer glow — wide, luminous, breathes — fluorescence microscopy style ──
         const glowR = (r + 35 + fire * 45 + energy * 18) * breathMod;
         const glow = ctx.createRadialGradient(n.x, n.y, r * 0.2, n.x, n.y, glowR);
         if (fire > 0.1) {
@@ -1684,7 +1684,7 @@ export default function Renew() {
         }
         ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(n.x, n.y, glowR, 0, Math.PI * 2); ctx.fill();
 
-        // Ã¢ÂÂÃ¢ÂÂ Irregular cell body (soma) Ã¢ÂÂ bright, luminous like microscopy Ã¢ÂÂÃ¢ÂÂ
+        // ── Irregular cell body (soma) — bright, luminous like microscopy ──
         ctx.beginPath();
         for (let i = 0; i <= n.bodyShape.length; i++) {
           const v = n.bodyShape[i % n.bodyShape.length];
@@ -1694,10 +1694,10 @@ export default function Renew() {
           if (i === 0) ctx.moveTo(vx, vy); else ctx.lineTo(vx, vy);
         }
         ctx.closePath();
-        // Very bright soma Ã¢ÂÂ near-white center with pillar tint
+        // Very bright soma — near-white center with pillar tint
         const somaGrad = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, r * 1.15);
         if (fire > 0.2) {
-          // Sharp white-hot center when firing Ã¢ÂÂ like a crystalline flash
+          // Sharp white-hot center when firing — like a crystalline flash
           somaGrad.addColorStop(0, `rgba(255, 253, 255, ${Math.min(0.95, (0.65 + fire * 0.4)) * lum})`);
           somaGrad.addColorStop(0.15, `${pc.brightRGB}${(0.5 + fire * 0.3) * lum})`);
           somaGrad.addColorStop(0.5, `${pc.softRGB}${(0.22 + fire * 0.15) * lum})`);
@@ -1710,11 +1710,11 @@ export default function Renew() {
         }
         ctx.fillStyle = somaGrad; ctx.fill();
 
-        // Translucent membrane edge Ã¢ÂÂ pillar-tinted
+        // Translucent membrane edge — pillar-tinted
         ctx.strokeStyle = `${pc.brightRGB}${(0.12 + fire * 0.15 + energy * 0.08) * n.maturity})`;
         ctx.lineWidth = 0.7; ctx.stroke();
 
-        // Ã¢ÂÂÃ¢ÂÂ Internal membrane blobs Ã¢ÂÂÃ¢ÂÂ
+        // ── Internal membrane blobs ──
         for (const blob of n.membraneBlobs) {
           const bx = n.x + blob.dx * r, by = n.y + blob.dy * r;
           const br = r * blob.size;
@@ -1724,7 +1724,7 @@ export default function Renew() {
           ctx.fillStyle = bg; ctx.beginPath(); ctx.arc(bx, by, br, 0, Math.PI * 2); ctx.fill();
         }
 
-        // Ã¢ÂÂÃ¢ÂÂ Spawn glow ring Ã¢ÂÂ expanding ring when neuron is brand new Ã¢ÂÂÃ¢ÂÂ
+        // ── Spawn glow ring — expanding ring when neuron is brand new ──
         if (n.maturity < 0.15) {
           const spawnPhase = n.maturity / 0.15; // 0 to 1 over first ~20 seconds
           const ringR = 15 + spawnPhase * 40;
@@ -1739,7 +1739,7 @@ export default function Renew() {
           ctx.fillStyle = spawnGlow; ctx.beginPath(); ctx.arc(n.x, n.y, ringR * 1.5, 0, Math.PI * 2); ctx.fill();
         }
 
-        // Ã¢ÂÂÃ¢ÂÂ Bright nucleus Ã¢ÂÂ hot white center Ã¢ÂÂÃ¢ÂÂ
+        // ── Bright nucleus — hot white center ──
         const hlR = r * 0.4;
         const hlX = n.x - r * 0.1, hlY = n.y - r * 0.1;
         const hlGrad = ctx.createRadialGradient(hlX, hlY, 0, hlX, hlY, hlR);
@@ -1756,11 +1756,11 @@ export default function Renew() {
 
   useEffect(() => () => stopListening(), [stopListening]);
 
-  // Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Session pillar colors for UI elements Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ
+  // ─── Session pillar colors for UI elements ───
   const sessionPillarUI = getPillarColors(selectedCategory?.name);
   const pillarAccentCSS = `rgb(${sessionPillarUI.fire[0]}, ${sessionPillarUI.fire[1]}, ${sessionPillarUI.fire[2]})`;
 
-  // Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Shared styles Ã¢ÂÂ silk-smooth transitions Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ
+  // ─── Shared styles — silk-smooth transitions ───
   const silk = "cubic-bezier(0.22, 1, 0.36, 1)"; // smooth deceleration
   const card = {
     background: P.card,
@@ -1822,7 +1822,7 @@ export default function Renew() {
     textTransform: "uppercase", fontFamily: FONT, marginTop: 4,
   };
 
-  // Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ SCREENS Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ
+  // ─── SCREENS ───
 
   const renderHome = () => (
     <div style={{
@@ -1835,14 +1835,14 @@ export default function Renew() {
       paddingRight: "max(28px, env(safe-area-inset-right, 28px))",
       fontFamily: FONT,
     }}>
-      {/* Breathing fog gradient Ã¢ÂÂ always present, slowly pulsing */}
+      {/* Breathing fog gradient — always present, slowly pulsing */}
       <div style={{
         position: "absolute", inset: 0, pointerEvents: "none",
         background: "radial-gradient(ellipse at 50% 40%, rgba(124,106,255,0.07) 0%, rgba(79,70,229,0.025) 40%, transparent 70%)",
         animation: "renewFogBreathe 12s ease-in-out infinite",
       }} />
 
-      {/* Logo mark Ã¢ÂÂ silky entrance */}
+      {/* Logo mark — silky entrance */}
       <div style={{
         width: 44, height: 44, borderRadius: "50%",
         background: "radial-gradient(circle, rgba(165,180,252,0.18), rgba(79,70,229,0.06) 60%, transparent 80%)",
@@ -1876,7 +1876,7 @@ export default function Renew() {
         animationDelay: "0.65s",
         overflow: "hidden",
       }}>
-        {/* Shimmer Ã¢ÂÂ light catching a thin wire */}
+        {/* Shimmer — light catching a thin wire */}
         <div style={{
           position: "absolute", inset: 0,
           background: "linear-gradient(90deg, transparent 30%, rgba(165,180,252,0.25) 50%, transparent 70%)",
@@ -1926,7 +1926,7 @@ export default function Renew() {
         </div>
       )}
 
-      {/* Sign out Ã¢ÂÂ top right, subtle */}
+      {/* Sign out — top right, subtle */}
       <button onClick={handleSignOut} style={{
         position: "absolute", top: "max(20px, env(safe-area-inset-top, 20px))", right: "max(22px, env(safe-area-inset-right, 22px))",
         background: "none", border: "none", color: P.textDim, fontSize: 9,
@@ -1958,7 +1958,7 @@ export default function Renew() {
         )}
       </div>
 
-      {/* Footer verse Ã¢ÂÂ breathing opacity animation */}
+      {/* Footer verse — breathing opacity animation */}
       <div style={{
         position: "absolute", bottom: "max(24px, env(safe-area-inset-bottom, 24px))", left: 20, right: 20, textAlign: "center",
         animation: "renewBreathe 8s cubic-bezier(0.37, 0, 0.63, 1) infinite",
@@ -2187,7 +2187,7 @@ export default function Renew() {
         </div>
       </div>
 
-      {/* Scripture card Ã¢ÂÂ glassmorphism */}
+      {/* Scripture card — glassmorphism */}
       {selectedPassage && (
         <div style={{ position: "absolute", top: "calc(56px + env(safe-area-inset-top, 0px))", left: 14, right: 14, zIndex: 10 }}>
           <div style={{
@@ -2216,7 +2216,7 @@ export default function Renew() {
         </div>
       )}
 
-      {/* Bottom controls Ã¢ÂÂ Joshua 1:8 + waveform + status + end */}
+      {/* Bottom controls — Joshua 1:8 + waveform + status + end */}
       <div style={{
         position: "absolute", bottom: 0, left: 0, right: 0,
         display: "flex", flexDirection: "column", alignItems: "center", gap: 5,
@@ -2227,7 +2227,7 @@ export default function Renew() {
         paddingTop: 14,
         background: "linear-gradient(0deg, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.6) 60%, transparent 100%)",
       }}>
-        {/* Joshua 1:8 Ã¢ÂÂ compact with breathing */}
+        {/* Joshua 1:8 — compact with breathing */}
         <div style={{ textAlign: "center", padding: "0 20px", marginBottom: 3 }}>
           <div style={{
             color: isSpeaking ? P.textDim : P.textGhost,
@@ -2245,7 +2245,7 @@ export default function Renew() {
           </div>
         </div>
 
-        {/* Live waveform visualizer Ã¢ÂÂ responsive to voice */}
+        {/* Live waveform visualizer — responsive to voice */}
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0 }}>
           <div style={{
             display: "flex", alignItems: "flex-end", gap: 2, height: 44,
@@ -2278,7 +2278,7 @@ export default function Renew() {
               );
             })}
           </div>
-          {/* Reflection Ã¢ÂÂ faint mirror below */}
+          {/* Reflection — faint mirror below */}
           <div style={{
             display: "flex", alignItems: "flex-start", gap: 2, height: 12,
             padding: "0 12px", opacity: isSpeaking ? 0.18 : 0.04,
@@ -2320,7 +2320,7 @@ export default function Renew() {
           {isSpeaking ? "speaking" : "listening"}
         </span>
 
-        {/* End button Ã¢ÂÂ large touch target for mobile */}
+        {/* End button — large touch target for mobile */}
         <button className="renew-btn-tap" onClick={endSession} style={{
           ...btnGhost,
           marginTop: 4,
@@ -2336,7 +2336,7 @@ export default function Renew() {
         }}>END</button>
       </div>
 
-      {/* Vignette Ã¢ÂÂ pulses with voice when speaking, dims to quiet anticipation when listening */}
+      {/* Vignette — pulses with voice when speaking, dims to quiet anticipation when listening */}
       <div style={{
         position: "absolute", inset: 0, pointerEvents: "none", zIndex: 5,
         boxShadow: isSpeaking
@@ -2414,7 +2414,7 @@ export default function Renew() {
           <div style={{ ...labelStyle, marginBottom: 24, color: P.textDim }}>spoken this session</div>
         </div>
 
-        {/* Growth this session Ã¢ÂÂ staggered reveal */}
+        {/* Growth this session — staggered reveal */}
         <div style={{
           ...card, padding: "16px 20px", marginBottom: 20, width: "100%", maxWidth: 300,
           animation: "renewFadeInUp 0.9s cubic-bezier(0.22, 1, 0.36, 1) both",
@@ -2586,7 +2586,7 @@ export default function Renew() {
   );
 
   // Screen content wrapper with transition animation
-  // Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Auth Screen Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ
+  // ─── Auth Screen ───
   if (authLoading) {
     return (
       <div style={{ background: "#000", width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -2606,6 +2606,7 @@ export default function Renew() {
       setTimeout(() => { setShowSplash(false); setSplashExiting(false); }, 700);
     };
 
+    // ─── Splash Screen — matches home screen aesthetic ───
     if (showSplash) {
       return (
         <div className="renew-noise" style={{
@@ -2709,6 +2710,7 @@ export default function Renew() {
       );
     }
 
+    // ─── Login Screen — appears after splash with blur transition ───
     return (
       <div className="renew-noise" style={{
         background: "#000", width: "100%", height: "100%",
@@ -2901,7 +2903,7 @@ export default function Renew() {
       <div key={screen} className={screen !== "session" ? "renew-screen-enter" : ""} style={{ position: "absolute", inset: 0, zIndex: 10 }}>
         {screenContent}
       </div>
-      {/* Loading state Ã¢ÂÂ logo dot materializing then dissolving */}
+      {/* Loading state — logo dot materializing then dissolving */}
       {!appLoaded && (
         <div style={{
           position: "absolute", inset: 0, zIndex: 100,
