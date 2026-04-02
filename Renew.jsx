@@ -153,14 +153,29 @@ const SCRIPTURE_CATEGORIES = [
     subtitle: "this is the structure God gives",
     icon: "\u{1F54A}\u{FE0F}",
     passages: [
+      // Provision
+      { ref: "Philippians 4:19", text: "And my God will supply every need of yours according to his riches in glory in Christ Jesus." },
+      { ref: "Psalm 23:1-4", text: "The Lord is my shepherd; I shall not want. He makes me lie down in green pastures. He leads me beside still waters. He restores my soul. He leads me in paths of righteousness for his name's sake. Even though I walk through the valley of the shadow of death, I will fear no evil, for you are with me; your rod and your staff, they comfort me." },
+      { ref: "Deuteronomy 8:18", text: "You shall remember the Lord your God, for it is he who gives you power to get wealth, that he may confirm his covenant that he swore to your fathers, as it is this day." },
+      { ref: "2 Corinthians 9:8", text: "And God is able to make all grace abound to you, so that having all sufficiency in all things at all times, you may abound in every good work." },
+      { ref: "Malachi 3:10", text: "Bring the full tithe into the storehouse, that there may be food in my house. And thereby put me to the test, says the Lord of hosts, if I will not open the windows of heaven for you and pour down for you a blessing until there is no more need." },
+      // Resources & Strength
       { ref: "Philippians 4:13", text: "I can do all things through him who strengthens me." },
-      { ref: "Isaiah 41:10", text: "Fear not, for I am with you; be not dismayed, for I am your God; I will strengthen you, I will help you, I will uphold you with my righteous right hand." },
-      { ref: "Proverbs 3:5\u20136", text: "Trust in the Lord with all your heart, and do not lean on your own understanding. In all your ways acknowledge him, and he will make straight your paths." },
       { ref: "Isaiah 40:31", text: "But they who wait for the Lord shall renew their strength; they shall mount up with wings like eagles; they shall run and not be weary; they shall walk and not faint." },
-      { ref: "Psalm 23:1\u20134", text: "The Lord is my shepherd; I shall not want. He makes me lie down in green pastures. He leads me beside still waters. He restores my soul. He leads me in paths of righteousness for his name\u2019s sake. Even though I walk through the valley of the shadow of death, I will fear no evil, for you are with me; your rod and your staff, they comfort me." },
-      { ref: "Romans 8:28", text: "And we know that for those who love God all things work together for good, for those who are called according to his purpose." },
-      { ref: "Philippians 4:6\u20137", text: "Do not be anxious about anything, but in everything by prayer and supplication with thanksgiving let your requests be made known to God. And the peace of God, which surpasses all understanding, will guard your hearts and your minds in Christ Jesus." },
+      { ref: "Isaiah 41:10", text: "Fear not, for I am with you; be not dismayed, for I am your God; I will strengthen you, I will help you, I will uphold you with my righteous right hand." },
+      // Systems & Structures
+      { ref: "Proverbs 3:5-6", text: "Trust in the Lord with all your heart, and do not lean on your own understanding. In all your ways acknowledge him, and he will make straight your paths." },
+      { ref: "Proverbs 24:3-4", text: "By wisdom a house is built, and by understanding it is established; by knowledge the rooms are filled with all precious and pleasant riches." },
+      { ref: "1 Corinthians 14:40", text: "But all things should be done decently and in order." },
+      { ref: "Habakkuk 2:2", text: "And the Lord answered me: Write the vision; make it plain on tablets, so he may run who reads it." },
+      // Government & Authority
+      { ref: "Romans 13:1", text: "Let every person be subject to the governing authorities. For there is no authority except from God, and those that exist have been instituted by God." },
+      { ref: "Proverbs 29:2", text: "When the righteous increase, the people rejoice, but when the wicked rule, the people groan." },
+      { ref: "Isaiah 9:6-7", text: "For to us a child is born, to us a son is given; and the government shall be upon his shoulder, and his name shall be called Wonderful Counselor, Mighty God, Everlasting Father, Prince of Peace. Of the increase of his government and of peace there will be no end." },
+      { ref: "Psalm 75:6-7", text: "For not from the east or from the west and not from the wilderness comes lifting up, but it is God who executes judgment, putting down one and lifting up another." },
+      // Faith & Trust
       { ref: "Hebrews 11:1", text: "Now faith is the assurance of things hoped for, the conviction of things not seen." },
+      { ref: "Romans 8:28", text: "And we know that for those who love God all things work together for good, for those who are called according to his purpose." },
     ]
   },
   {
@@ -168,14 +183,29 @@ const SCRIPTURE_CATEGORIES = [
     subtitle: "this is the mission God gives",
     icon: "\u{1F525}",
     passages: [
-      { ref: "Joshua 1:8\u20139", text: "This Book of the Law shall not depart from your mouth, but you shall meditate on it day and night, so that you may be careful to do according to all that is written in it. For then you will make your way prosperous, and then you will have good success. Have I not commanded you? Be strong and courageous. Do not be frightened, and do not be dismayed, for the Lord your God is with you wherever you go." },
+      // God's Plan & Purpose
       { ref: "Jeremiah 29:11", text: "For I know the plans I have for you, declares the Lord, plans for welfare and not for evil, to give you a future and a hope." },
+      { ref: "Proverbs 19:21", text: "Many are the plans in the mind of a man, but it is the purpose of the Lord that will stand." },
+      { ref: "Isaiah 46:10", text: "Declaring the end from the beginning and from ancient times things not yet done, saying, My counsel shall stand, and I will accomplish all my purpose." },
+      { ref: "Psalm 138:8", text: "The Lord will fulfill his purpose for me; your steadfast love, O Lord, endures forever. Do not forsake the work of your hands." },
+      { ref: "Romans 8:28", text: "And we know that for those who love God all things work together for good, for those who are called according to his purpose." },
+      // Times & Seasons
+      { ref: "Ecclesiastes 3:1", text: "For everything there is a season, and a time for every matter under heaven." },
+      { ref: "Acts 1:7", text: "He said to them, It is not for you to know times or seasons that the Father has fixed by his own authority." },
+      { ref: "Habakkuk 2:3", text: "For still the vision awaits its appointed time; it hastens to the end -- it will not lie. If it seems slow, wait for it; it will surely come; it will not delay." },
+      { ref: "Psalm 31:15", text: "My times are in your hand; rescue me from the hand of my enemies and from my persecutors!" },
+      { ref: "Galatians 6:9", text: "And let us not grow weary of doing good, for in due season we will reap, if we do not give up." },
+      { ref: "Isaiah 60:22", text: "The least one shall become a clan, and the smallest one a mighty nation; I am the Lord; in its time I will hasten it." },
+      // Mission & Calling
+      { ref: "Joshua 1:8-9", text: "This Book of the Law shall not depart from your mouth, but you shall meditate on it day and night, so that you may be careful to do according to all that is written in it. For then you will make your way prosperous, and then you will have good success. Have I not commanded you? Be strong and courageous. Do not be frightened, and do not be dismayed, for the Lord your God is with you wherever you go." },
+      { ref: "Matthew 28:19-20", text: "Go therefore and make disciples of all nations, baptizing them in the name of the Father and of the Son and of the Holy Spirit, teaching them to observe all that I have commanded you. And behold, I am with you always, to the end of the age." },
+      { ref: "Isaiah 6:8", text: "And I heard the voice of the Lord saying, Whom shall I send, and who will go for us? Then I said, Here I am! Send me." },
       { ref: "Micah 6:8", text: "He has told you, O man, what is good; and what does the Lord require of you but to do justice, and to love kindness, and to walk humbly with your God?" },
-      { ref: "Matthew 28:19\u201320", text: "Go therefore and make disciples of all nations, baptizing them in the name of the Father and of the Son and of the Holy Spirit, teaching them to observe all that I have commanded you. And behold, I am with you always, to the end of the age." },
-      { ref: "Isaiah 6:8", text: "And I heard the voice of the Lord saying, \u201CWhom shall I send, and who will go for us?\u201D Then I said, \u201CHere I am! Send me.\u201D" },
-      { ref: "Ephesians 6:10\u201311", text: "Finally, be strong in the Lord and in the strength of his might. Put on the whole armor of God, that you may be able to stand against the schemes of the devil." },
+      // Courage & Strength for the Assignment
       { ref: "2 Timothy 1:7", text: "For God gave us a spirit not of fear but of power and love and self-control." },
+      { ref: "Ephesians 6:10-11", text: "Finally, be strong in the Lord and in the strength of his might. Put on the whole armor of God, that you may be able to stand against the schemes of the devil." },
       { ref: "Deuteronomy 31:6", text: "Be strong and courageous. Do not fear or be in dread of them, for it is the Lord your God who goes with you. He will not leave you or forsake you." },
+      { ref: "Esther 4:14", text: "For if you keep silent at this time, relief and deliverance will rise for the Jews from another place, but you and your father's house will perish. And who knows whether you have not come to the kingdom for such a time as this?" },
     ]
   },
 ];
@@ -1171,17 +1201,15 @@ export default function Renew() {
   const renderHome = () => (
     <div style={{
       position: "absolute", inset: 0, zIndex: 20,
-      display: "flex", flexDirection: "column", alignItems: "center",
+      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
       background: "radial-gradient(ellipse at 50% 40%, rgba(124,106,255,0.04) 0%, #000 70%)",
-      padding: 28,
+      padding: "0 28px",
       paddingTop: "max(28px, env(safe-area-inset-top, 28px))",
-      paddingBottom: "max(28px, env(safe-area-inset-bottom, 28px))",
+      paddingBottom: "max(100px, calc(100px + env(safe-area-inset-bottom, 0px)))",
       paddingLeft: "max(28px, env(safe-area-inset-left, 28px))",
       paddingRight: "max(28px, env(safe-area-inset-right, 28px))",
       fontFamily: FONT,
     }}>
-      {/* Spacer to push content above true center */}
-      <div style={{ flex: "1 1 0" }} />
 
       {/* Logo mark */}
       <div style={{
@@ -1266,9 +1294,6 @@ export default function Renew() {
           View History
         </button>
       )}
-
-      {/* Bottom spacer — larger than top so content sits above true center */}
-      <div style={{ flex: "1.6 1 0" }} />
 
       {/* Footer verse */}
       <div style={{ position: "absolute", bottom: "max(24px, env(safe-area-inset-bottom, 24px))", left: 20, right: 20, textAlign: "center" }}>
@@ -1746,7 +1771,7 @@ export default function Renew() {
 
   return (
     <div style={{
-      background: P.black, width: "100%", height: "100dvh",
+      background: P.black, width: "100%", height: "100%",
       position: "relative", overflow: "hidden", fontFamily: FONT,
     }}>
       <div style={{ position: "absolute", inset: 0 }}>
