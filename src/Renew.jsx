@@ -1,5 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import * as Tone from "tone";
+import { auth, googleProvider, db } from "./firebase";
+import { onAuthStateChanged, signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "firebase/auth";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 
 // ─── Neural Network Simulation ───
 // Joshua 1:8 — "This Book of the Law shall not depart from your mouth..."
@@ -350,41 +353,89 @@ function getPillarCached(pillar) {
 
 // ─── Scripture Library ───
 // Three pillars: Person (who you are), Vehicle (how you move), Assignment (what you're called to)
+// ─── Scripture Library ───
+// Translation: English Standard Version (ESV)
+// Three pillars: Person (who you are), Vehicle (how you move), Assignment (what you're called to)
+// All passages arranged in canonical Bible order within each pillar
+const SCRIPTURE_TRANSLATION = "ESV";
+
 const SCRIPTURE_CATEGORIES = [
   {
     name: "PERSON",
     subtitle: "this is you",
     icon: "\u{1FA9E}",
     passages: [
-      // Identity
-      { ref: "2 Corinthians 5:17", text: "Therefore, if anyone is in Christ, he is a new creation. The old has passed away; behold, the new has come." },
-      { ref: "1 Peter 2:9", text: "But you are a chosen race, a royal priesthood, a holy nation, a people for his own possession, that you may proclaim the excellencies of him who called you out of darkness into his marvelous light." },
-      { ref: "John 1:12", text: "But to all who did receive him, who believed in his name, he gave the right to become children of God." },
-      { ref: "Galatians 2:20", text: "I have been crucified with Christ. It is no longer I who live, but Christ who lives in me. And the life I now live in the flesh I live by faith in the Son of God, who loved me and gave himself for me." },
-      // Purpose
-      { ref: "Ephesians 2:10", text: "For we are his workmanship, created in Christ Jesus for good works, which God prepared beforehand, that we should walk in them." },
-      { ref: "Jeremiah 1:5", text: "Before I formed you in the womb I knew you, and before you were born I consecrated you; I appointed you a prophet to the nations." },
-      { ref: "Colossians 3:3", text: "For you have died, and your life is hidden with Christ in God." },
-      // Spirit
-      { ref: "Romans 8:16", text: "The Spirit himself bears witness with our spirit that we are children of God." },
-      { ref: "John 4:24", text: "God is spirit, and those who worship him must worship in spirit and truth." },
-      { ref: "1 Corinthians 2:12", text: "Now we have received not the spirit of the world, but the Spirit who is from God, that we might understand the things freely given us by God." },
-      // Soul
-      { ref: "Psalm 139:14", text: "I praise you, for I am fearfully and wonderfully made. Wonderful are your works; my soul knows it very well." },
+      // ── Psalms — identity, soul, worship, inner life ──
+      { ref: "Psalm 1:1-3", text: "Blessed is the man who walks not in the counsel of the wicked, nor stands in the way of sinners, nor sits in the seat of scoffers; but his delight is in the law of the Lord, and on his law he meditates day and night. He is like a tree planted by streams of water that yields its fruit in its season, and its leaf does not wither. In all that he does, he prospers." },
+      { ref: "Psalm 8:4-6", text: "What is man that you are mindful of him, and the son of man that you care for him? Yet you have made him a little lower than the heavenly beings and crowned him with glory and honor. You have given him dominion over the works of your hands; you have put all things under his feet." },
+      { ref: "Psalm 16:11", text: "You make known to me the path of life; in your presence there is fullness of joy; at your right hand are pleasures forevermore." },
+      { ref: "Psalm 17:15", text: "As for me, I shall behold your face in righteousness; when I awake, I shall be satisfied with your likeness." },
+      { ref: "Psalm 23:1-3", text: "The Lord is my shepherd; I shall not want. He makes me lie down in green pastures. He leads me beside still waters. He restores my soul. He leads me in paths of righteousness for his name's sake." },
+      { ref: "Psalm 27:1", text: "The Lord is my light and my salvation; whom shall I fear? The Lord is the stronghold of my life; of whom shall I be afraid?" },
+      { ref: "Psalm 27:4", text: "One thing have I asked of the Lord, that will I seek after: that I may dwell in the house of the Lord all the days of my life, to gaze upon the beauty of the Lord and to inquire in his temple." },
+      { ref: "Psalm 34:8", text: "Oh, taste and see that the Lord is good! Blessed is the man who takes refuge in him!" },
+      { ref: "Psalm 36:9", text: "For with you is the fountain of life; in your light do we see light." },
       { ref: "Psalm 42:1-2", text: "As a deer pants for flowing streams, so pants my soul for you, O God. My soul thirsts for God, for the living God." },
-      { ref: "3 John 1:2", text: "Beloved, I pray that all may go well with you and that you may be in good health, as it goes well with your soul." },
-      // Body
-      { ref: "1 Corinthians 6:19-20", text: "Do you not know that your body is a temple of the Holy Spirit within you, whom you have from God? You are not your own, for you were bought with a price. So glorify God in your body." },
-      { ref: "Romans 12:1", text: "I appeal to you therefore, brothers, by the mercies of God, to present your bodies as a living sacrifice, holy and acceptable to God, which is your spiritual worship." },
-      // Spirit, Soul & Body
-      { ref: "1 Thessalonians 5:23", text: "Now may the God of peace himself sanctify you completely, and may your whole spirit and soul and body be kept blameless at the coming of our Lord Jesus Christ." },
-      // Praise & Worship
+      { ref: "Psalm 46:10", text: "Be still, and know that I am God. I will be exalted among the nations, I will be exalted in the earth!" },
+      { ref: "Psalm 51:10-12", text: "Create in me a clean heart, O God, and renew a right spirit within me. Cast me not away from your presence, and take not your Holy Spirit from me. Restore to me the joy of your salvation, and uphold me with a willing spirit." },
+      { ref: "Psalm 63:1-3", text: "O God, you are my God; earnestly I seek you; my soul thirsts for you; my flesh faints for you, as in a dry and weary land where there is no water. So I have looked upon you in the sanctuary, beholding your power and glory. Because your steadfast love is better than life, my lips will praise you." },
+      { ref: "Psalm 84:10-11", text: "For a day in your courts is better than a thousand elsewhere. I would rather be a doorkeeper in the house of my God than dwell in the tents of wickedness. For the Lord God is a sun and shield; the Lord bestows favor and honor. No good thing does he withhold from those who walk uprightly." },
+      { ref: "Psalm 91:1-2", text: "He who dwells in the shelter of the Most High will abide in the shadow of the Almighty. I will say to the Lord, My refuge and my fortress, my God, in whom I trust." },
+      { ref: "Psalm 103:1-5", text: "Bless the Lord, O my soul, and all that is within me, bless his holy name! Bless the Lord, O my soul, and forget not all his benefits, who forgives all your iniquity, who heals all your diseases, who redeems your life from the pit, who crowns you with steadfast love and mercy, who satisfies you with good so that your youth is renewed like the eagle's." },
+      { ref: "Psalm 119:105", text: "Your word is a lamp to my feet and a light to my path." },
+      { ref: "Psalm 139:13-14", text: "For you formed my inward parts; you knitted me together in my mother's womb. I praise you, for I am fearfully and wonderfully made. Wonderful are your works; my soul knows it very well." },
+      { ref: "Psalm 139:23-24", text: "Search me, O God, and know my heart! Try me and know my thoughts! And see if there be any grievous way in me, and lead me in the way everlasting!" },
+      { ref: "Psalm 143:8", text: "Let me hear in the morning of your steadfast love, for in you I trust. Make me know the way I should go, for to you I lift up my soul." },
       { ref: "Psalm 146:1-2", text: "Praise the Lord! Praise the Lord, O my soul! I will praise the Lord as long as I live; I will sing praises to my God while I have my being." },
-      // Peace & Mind
+      // ── Proverbs — heart, character, wisdom, inner man ──
+      { ref: "Proverbs 2:6-7", text: "For the Lord gives wisdom; from his mouth come knowledge and understanding; he stores up sound wisdom for the upright; he is a shield to those who walk in integrity." },
+      { ref: "Proverbs 3:1-2", text: "My son, do not forget my teaching, but let your heart keep my commandments, for length of days and years of life and peace they will add to you." },
+      { ref: "Proverbs 3:13-15", text: "Blessed is the one who finds wisdom, and the one who gets understanding, for the gain from her is better than gain from silver and her profit better than gold. She is more precious than jewels, and nothing you desire can compare with her." },
+      { ref: "Proverbs 4:23", text: "Keep your heart with all vigilance, for from it flow the springs of life." },
+      { ref: "Proverbs 14:30", text: "A tranquil heart gives life to the flesh, but envy makes the bones rot." },
+      { ref: "Proverbs 15:13", text: "A glad heart makes a cheerful face, but by sorrow of heart the spirit is crushed." },
+      { ref: "Proverbs 16:32", text: "Whoever is slow to anger is better than the mighty, and he who rules his spirit than he who takes a city." },
+      { ref: "Proverbs 17:22", text: "A joyful heart is good medicine, but a crushed spirit dries up the bones." },
+      { ref: "Proverbs 18:21", text: "Death and life are in the power of the tongue, and those who love it will eat its fruits." },
+      { ref: "Proverbs 20:27", text: "The spirit of man is the lamp of the Lord, searching all his innermost parts." },
+      { ref: "Proverbs 23:7", text: "For as he thinks in his heart, so is he." },
+      { ref: "Proverbs 25:28", text: "A man without self-control is like a city broken into and left without walls." },
+      // ── Prophets ──
       { ref: "Isaiah 26:3", text: "You keep him in perfect peace whose mind is stayed on you, because he trusts in you." },
       { ref: "Isaiah 26:7", text: "The path of the righteous is level; you make level the way of the righteous." },
-      // Character & Conduct
+      { ref: "Isaiah 43:1", text: "But now thus says the Lord, he who created you, O Jacob, he who formed you, O Israel: Fear not, for I have redeemed you; I have called you by name, you are mine." },
+      { ref: "Isaiah 43:4", text: "Because you are precious in my eyes, and honored, and I love you, I give men in return for you, peoples in exchange for your life." },
+      { ref: "Isaiah 54:17", text: "No weapon that is fashioned against you shall succeed, and you shall refute every tongue that rises against you in judgment. This is the heritage of the servants of the Lord and their vindication from me, declares the Lord." },
+      { ref: "Jeremiah 1:5", text: "Before I formed you in the womb I knew you, and before you were born I consecrated you; I appointed you a prophet to the nations." },
+      { ref: "Jeremiah 17:7-8", text: "Blessed is the man who trusts in the Lord, whose trust is the Lord. He is like a tree planted by water, that sends out its roots by the stream, and does not fear when heat comes, for its leaves remain green, and is not anxious in the year of drought, for it does not cease to bear fruit." },
+      { ref: "Ezekiel 36:26", text: "And I will give you a new heart, and a new spirit I will put within you. And I will remove the heart of stone from your flesh and give you a heart of flesh." },
+      // ── Gospels ──
+      { ref: "John 1:12", text: "But to all who did receive him, who believed in his name, he gave the right to become children of God." },
+      { ref: "John 4:24", text: "God is spirit, and those who worship him must worship in spirit and truth." },
+      { ref: "John 10:10", text: "The thief comes only to steal and kill and destroy. I came that they may have life and have it abundantly." },
+      { ref: "John 15:5", text: "I am the vine; you are the branches. Whoever abides in me and I in him, he it is that bears much fruit, for apart from me you can do nothing." },
+      // ── Epistles ──
+      { ref: "Romans 5:8", text: "But God shows his love for us in that while we were still sinners, Christ died for us." },
+      { ref: "Romans 8:1", text: "There is therefore now no condemnation for those who are in Christ Jesus." },
+      { ref: "Romans 8:16-17", text: "The Spirit himself bears witness with our spirit that we are children of God, and if children, then heirs -- heirs of God and fellow heirs with Christ, provided we suffer with him in order that we may also be glorified with him." },
+      { ref: "Romans 12:1-2", text: "I appeal to you therefore, brothers, by the mercies of God, to present your bodies as a living sacrifice, holy and acceptable to God, which is your spiritual worship. Do not be conformed to this world, but be transformed by the renewal of your mind, that by testing you may discern what is the will of God, what is good and acceptable and perfect." },
+      { ref: "1 Corinthians 2:12", text: "Now we have received not the spirit of the world, but the Spirit who is from God, that we might understand the things freely given us by God." },
+      { ref: "1 Corinthians 6:19-20", text: "Do you not know that your body is a temple of the Holy Spirit within you, whom you have from God? You are not your own, for you were bought with a price. So glorify God in your body." },
+      { ref: "2 Corinthians 3:18", text: "And we all, with unveiled face, beholding the glory of the Lord, are being transformed into the same image from one degree of glory to another. For this comes from the Lord who is the Spirit." },
+      { ref: "2 Corinthians 5:17", text: "Therefore, if anyone is in Christ, he is a new creation. The old has passed away; behold, the new has come." },
+      { ref: "Galatians 2:20", text: "I have been crucified with Christ. It is no longer I who live, but Christ who lives in me. And the life I now live in the flesh I live by faith in the Son of God, who loved me and gave himself for me." },
+      { ref: "Galatians 5:22-23", text: "But the fruit of the Spirit is love, joy, peace, patience, kindness, goodness, faithfulness, gentleness, self-control; against such things there is no law." },
+      { ref: "Ephesians 1:4-5", text: "Even as he chose us in him before the foundation of the world, that we should be holy and blameless before him. In love he predestined us for adoption to himself as sons through Jesus Christ, according to the purpose of his will." },
+      { ref: "Ephesians 2:10", text: "For we are his workmanship, created in Christ Jesus for good works, which God prepared beforehand, that we should walk in them." },
+      { ref: "Ephesians 3:16-17", text: "That according to the riches of his glory he may grant you to be strengthened with power through his Spirit in your inner being, so that Christ may dwell in your hearts through faith." },
+      { ref: "Philippians 1:6", text: "And I am sure of this, that he who began a good work in you will bring it to completion at the day of Jesus Christ." },
+      { ref: "Philippians 4:8", text: "Finally, brothers, whatever is true, whatever is honorable, whatever is just, whatever is pure, whatever is lovely, whatever is commendable, if there is any excellence, if there is anything worthy of praise, think about these things." },
+      { ref: "Colossians 3:1-3", text: "If then you have been raised with Christ, seek the things that are above, where Christ is, seated at the right hand of God. Set your minds on things that are above, not on things that are on earth. For you have died, and your life is hidden with Christ in God." },
+      { ref: "1 Thessalonians 5:23", text: "Now may the God of peace himself sanctify you completely, and may your whole spirit and soul and body be kept blameless at the coming of our Lord Jesus Christ." },
       { ref: "James 1:19-21", text: "Know this, my beloved brothers: let every person be quick to hear, slow to speak, slow to anger; for the anger of man does not produce the righteousness of God. Therefore put away all filthiness and rampant wickedness and receive with meekness the implanted word, which is able to save your souls." },
+      { ref: "1 Peter 2:9", text: "But you are a chosen race, a royal priesthood, a holy nation, a people for his own possession, that you may proclaim the excellencies of him who called you out of darkness into his marvelous light." },
+      { ref: "1 John 3:1", text: "See what kind of love the Father has given to us, that we should be called children of God; and so we are." },
+      { ref: "3 John 1:2", text: "Beloved, I pray that all may go well with you and that you may be in good health, as it goes well with your soul." },
     ]
   },
   {
@@ -392,29 +443,70 @@ const SCRIPTURE_CATEGORIES = [
     subtitle: "this is the structure God gives",
     icon: "\u{1F54A}\u{FE0F}",
     passages: [
-      // Provision
-      { ref: "Philippians 4:19", text: "And my God will supply every need of yours according to his riches in glory in Christ Jesus." },
-      { ref: "Psalm 23:1-4", text: "The Lord is my shepherd; I shall not want. He makes me lie down in green pastures. He leads me beside still waters. He restores my soul. He leads me in paths of righteousness for his name's sake. Even though I walk through the valley of the shadow of death, I will fear no evil, for you are with me; your rod and your staff, they comfort me." },
+      // ── Torah — covenant foundations of provision ──
+      { ref: "Genesis 12:2-3", text: "And I will make of you a great nation, and I will bless you and make your name great, so that you will be a blessing. I will bless those who bless you, and him who dishonors you I will curse, and in you all the families of the earth shall be blessed." },
+      { ref: "Genesis 22:14", text: "So Abraham called the name of that place, The Lord will provide; as it is said to this day, On the mount of the Lord it shall be provided." },
       { ref: "Deuteronomy 8:18", text: "You shall remember the Lord your God, for it is he who gives you power to get wealth, that he may confirm his covenant that he swore to your fathers, as it is this day." },
-      { ref: "2 Corinthians 9:8", text: "And God is able to make all grace abound to you, so that having all sufficiency in all things at all times, you may abound in every good work." },
-      { ref: "Malachi 3:10", text: "Bring the full tithe into the storehouse, that there may be food in my house. And thereby put me to the test, says the Lord of hosts, if I will not open the windows of heaven for you and pour down for you a blessing until there is no more need." },
-      // Resources & Strength
-      { ref: "Philippians 4:13", text: "I can do all things through him who strengthens me." },
+      { ref: "Deuteronomy 28:1-2", text: "And if you faithfully obey the voice of the Lord your God, being careful to do all his commandments that I command you today, the Lord your God will set you high above all the nations of the earth. And all these blessings shall come upon you and overtake you, if you obey the voice of the Lord your God." },
+      { ref: "Deuteronomy 28:12-13", text: "The Lord will open to you his good treasury, the heavens, to give the rain to your land in its season and to bless all the work of your hands. And you shall lend to many nations, but you shall not borrow. And the Lord will make you the head and not the tail, and you shall only go up and not down." },
+      // ── Psalms — provision, blessing, favour, structure ──
+      { ref: "Psalm 1:1-3", text: "Blessed is the man who walks not in the counsel of the wicked, nor stands in the way of sinners, nor sits in the seat of scoffers; but his delight is in the law of the Lord, and on his law he meditates day and night. He is like a tree planted by streams of water that yields its fruit in its season, and its leaf does not wither. In all that he does, he prospers." },
+      { ref: "Psalm 23:1-6", text: "The Lord is my shepherd; I shall not want. He makes me lie down in green pastures. He leads me beside still waters. He restores my soul. He leads me in paths of righteousness for his name's sake. Even though I walk through the valley of the shadow of death, I will fear no evil, for you are with me; your rod and your staff, they comfort me. You prepare a table before me in the presence of my enemies; you anoint my head with oil; my cup overflows. Surely goodness and mercy shall follow me all the days of my life, and I shall dwell in the house of the Lord forever." },
+      { ref: "Psalm 24:1", text: "The earth is the Lord's and the fullness thereof, the world and those who dwell therein." },
+      { ref: "Psalm 35:27", text: "Let those who delight in my righteousness shout for joy and be glad and say evermore, Great is the Lord, who delights in the welfare of his servant!" },
+      { ref: "Psalm 37:4-5", text: "Delight yourself in the Lord, and he will give you the desires of your heart. Commit your way to the Lord; trust in him, and he will act." },
+      { ref: "Psalm 37:25-26", text: "I have been young, and now am old, yet I have not seen the righteous forsaken or his children begging for bread. He is ever lending generously, and his children become a blessing." },
+      { ref: "Psalm 50:10-12", text: "For every beast of the forest is mine, the cattle on a thousand hills. I know all the birds of the hills, and all that moves in the field is mine. If I were hungry, I would not tell you, for the world and its fullness are mine." },
+      { ref: "Psalm 67:1-2", text: "May God be gracious to us and bless us and make his face to shine upon us, that your way may be known on earth, your saving power among all nations." },
+      { ref: "Psalm 67:5-7", text: "Let the peoples praise you, O God; let all the peoples praise you! The earth has yielded its increase; God, our God, shall bless us. God shall bless us; let all the ends of the earth fear him!" },
+      { ref: "Psalm 75:6-7", text: "For not from the east or from the west and not from the wilderness comes lifting up, but it is God who executes judgment, putting down one and lifting up another." },
+      { ref: "Psalm 90:17", text: "Let the favor of the Lord our God be upon us, and establish the work of our hands upon us; yes, establish the work of our hands!" },
+      { ref: "Psalm 112:1-3", text: "Praise the Lord! Blessed is the man who fears the Lord, who greatly delights in his commandments! His offspring will be mighty in the land; the generation of the upright will be blessed. Wealth and riches are in his house, and his righteousness endures forever." },
+      { ref: "Psalm 115:14-16", text: "May the Lord give you increase, you and your children! May you be blessed by the Lord, who made heaven and earth! The heavens are the Lord's heavens, but the earth he has given to the children of man." },
+      { ref: "Psalm 127:1", text: "Unless the Lord builds the house, those who build it labor in vain. Unless the Lord watches over the city, the watchman stays awake in vain." },
+      { ref: "Psalm 128:1-4", text: "Blessed is everyone who fears the Lord, who walks in his ways! You shall eat the fruit of the labor of your hands; you shall be blessed, and it shall be well with you. Your wife will be like a fruitful vine within your house; your children will be like olive shoots around your table. Behold, thus shall the man be blessed who fears the Lord." },
+      { ref: "Psalm 145:15-16", text: "The eyes of all look to you, and you give them their food in due season. You open your hand; you satisfy the desire of every living thing." },
+      // ── Proverbs — wisdom, diligence, wealth, stewardship, counsel ──
+      { ref: "Proverbs 3:5-6", text: "Trust in the Lord with all your heart, and do not lean on your own understanding. In all your ways acknowledge him, and he will make straight your paths." },
+      { ref: "Proverbs 3:9-10", text: "Honor the Lord with your wealth and with the firstfruits of all your produce; then your barns will be filled with plenty, and your vats will be bursting with wine." },
+      { ref: "Proverbs 8:12", text: "I, wisdom, dwell with prudence, and I find knowledge and discretion." },
+      { ref: "Proverbs 8:17-21", text: "I love those who love me, and those who seek me diligently find me. Riches and honor are with me, enduring wealth and righteousness. My fruit is better than gold, even fine gold, and my yield than choice silver. I walk in the way of righteousness, in the paths of justice, granting an inheritance to those who love me, and filling their treasuries." },
+      { ref: "Proverbs 10:4", text: "A slack hand causes poverty, but the hand of the diligent makes rich." },
+      { ref: "Proverbs 10:22", text: "The blessing of the Lord makes rich, and he adds no sorrow with it." },
+      { ref: "Proverbs 11:14", text: "Where there is no guidance, a people falls, but in an abundance of counselors there is safety." },
+      { ref: "Proverbs 11:24-25", text: "One gives freely, yet grows all the richer; another withholds what he should give, and only suffers want. Whoever brings blessing will be enriched, and one who waters will himself be watered." },
+      { ref: "Proverbs 13:11", text: "Wealth gained hastily will dwindle, but whoever gathers little by little will increase it." },
+      { ref: "Proverbs 13:22", text: "A good man leaves an inheritance to his children's children, but the sinner's wealth is laid up for the righteous." },
+      { ref: "Proverbs 16:3", text: "Commit your work to the Lord, and your plans will be established." },
+      { ref: "Proverbs 21:5", text: "The plans of the diligent lead surely to abundance, but everyone who is hasty comes only to poverty." },
+      { ref: "Proverbs 22:4", text: "The reward for humility and fear of the Lord is riches and honor and life." },
+      { ref: "Proverbs 24:3-4", text: "By wisdom a house is built, and by understanding it is established; by knowledge the rooms are filled with all precious and pleasant riches." },
+      { ref: "Proverbs 27:23-24", text: "Know well the condition of your flocks, and give attention to your herds, for riches do not last forever; and does a crown endure to all generations?" },
+      { ref: "Proverbs 29:2", text: "When the righteous increase, the people rejoice, but when the wicked rule, the people groan." },
+      // ── Prophets — nations bringing resources, divine economy, government ──
+      { ref: "Isaiah 2:2-3", text: "It shall come to pass in the latter days that the mountain of the house of the Lord shall be established as the highest of the mountains, and shall be lifted up above the hills; and all the nations shall flow to it, and many peoples shall come, and say: Come, let us go up to the mountain of the Lord, to the house of the God of Jacob, that he may teach us his ways and that we may walk in his paths." },
+      { ref: "Isaiah 9:6-7", text: "For to us a child is born, to us a son is given; and the government shall be upon his shoulder, and his name shall be called Wonderful Counselor, Mighty God, Everlasting Father, Prince of Peace. Of the increase of his government and of peace there will be no end." },
       { ref: "Isaiah 40:31", text: "But they who wait for the Lord shall renew their strength; they shall mount up with wings like eagles; they shall run and not be weary; they shall walk and not faint." },
       { ref: "Isaiah 41:10", text: "Fear not, for I am with you; be not dismayed, for I am your God; I will strengthen you, I will help you, I will uphold you with my righteous right hand." },
-      // Systems & Structures
-      { ref: "Proverbs 3:5-6", text: "Trust in the Lord with all your heart, and do not lean on your own understanding. In all your ways acknowledge him, and he will make straight your paths." },
-      { ref: "Proverbs 24:3-4", text: "By wisdom a house is built, and by understanding it is established; by knowledge the rooms are filled with all precious and pleasant riches." },
-      { ref: "1 Corinthians 14:40", text: "But all things should be done decently and in order." },
+      { ref: "Isaiah 45:3", text: "I will give you the treasures of darkness and the hoards in secret places, that you may know that it is I, the Lord, the God of Israel, who call you by your name." },
+      { ref: "Isaiah 60:5-7", text: "Then you shall see and be radiant; your heart shall thrill and exult, because the abundance of the sea shall be turned to you, the wealth of the nations shall come to you. A multitude of camels shall cover you, the young camels of Midian and Ephah; all those from Sheba shall come. They shall bring gold and frankincense, and shall bring good news, the praises of the Lord." },
+      { ref: "Isaiah 60:10-11", text: "Foreigners shall build up your walls, and their kings shall minister to you; for in my wrath I struck you, but in my favor I have had mercy on you. Your gates shall be open continually; day and night they shall not be shut, that people may bring to you the wealth of the nations, with their kings led in procession." },
+      { ref: "Isaiah 61:5-6", text: "Strangers shall stand and tend your flocks; foreigners shall be your plowmen and vinedressers; but you shall be called the priests of the Lord; they shall speak of you as the ministers of our God; you shall eat the wealth of the nations, and in their glory you shall boast." },
+      { ref: "Haggai 2:7-8", text: "And I will shake all nations, so that the treasures of all nations shall come in, and I will fill this house with glory, says the Lord of hosts. The silver is mine, and the gold is mine, declares the Lord of hosts." },
       { ref: "Habakkuk 2:2", text: "And the Lord answered me: Write the vision; make it plain on tablets, so he may run who reads it." },
-      // Government & Authority
-      { ref: "Romans 13:1", text: "Let every person be subject to the governing authorities. For there is no authority except from God, and those that exist have been instituted by God." },
-      { ref: "Proverbs 29:2", text: "When the righteous increase, the people rejoice, but when the wicked rule, the people groan." },
-      { ref: "Isaiah 9:6-7", text: "For to us a child is born, to us a son is given; and the government shall be upon his shoulder, and his name shall be called Wonderful Counselor, Mighty God, Everlasting Father, Prince of Peace. Of the increase of his government and of peace there will be no end." },
-      { ref: "Psalm 75:6-7", text: "For not from the east or from the west and not from the wilderness comes lifting up, but it is God who executes judgment, putting down one and lifting up another." },
-      // Faith & Trust
-      { ref: "Hebrews 11:1", text: "Now faith is the assurance of things hoped for, the conviction of things not seen." },
+      { ref: "Malachi 3:10-11", text: "Bring the full tithe into the storehouse, that there may be food in my house. And thereby put me to the test, says the Lord of hosts, if I will not open the windows of heaven for you and pour down for you a blessing until there is no more need. I will rebuke the devourer for you, so that it will not destroy the fruits of your soil, and your vine in the field shall not fail to bear, says the Lord of hosts." },
+      // ── Gospels & Acts ──
+      { ref: "Matthew 6:33", text: "But seek first the kingdom of God and his righteousness, and all these things will be added to you." },
+      { ref: "Luke 6:38", text: "Give, and it will be given to you. Good measure, pressed down, shaken together, running over, will be put into your lap. For with the measure you use it will be measured back to you." },
+      // ── Epistles ──
       { ref: "Romans 8:28", text: "And we know that for those who love God all things work together for good, for those who are called according to his purpose." },
+      { ref: "Romans 13:1", text: "Let every person be subject to the governing authorities. For there is no authority except from God, and those that exist have been instituted by God." },
+      { ref: "1 Corinthians 14:40", text: "But all things should be done decently and in order." },
+      { ref: "2 Corinthians 9:6-8", text: "The point is this: whoever sows sparingly will also reap sparingly, and whoever sows bountifully will also reap bountifully. Each one must give as he has decided in his heart, not reluctantly or under compulsion, for God loves a cheerful giver. And God is able to make all grace abound to you, so that having all sufficiency in all things at all times, you may abound in every good work." },
+      { ref: "Philippians 4:13", text: "I can do all things through him who strengthens me." },
+      { ref: "Philippians 4:19", text: "And my God will supply every need of yours according to his riches in glory in Christ Jesus." },
+      { ref: "Hebrews 11:1", text: "Now faith is the assurance of things hoped for, the conviction of things not seen." },
+      { ref: "James 1:5", text: "If any of you lacks wisdom, let him ask God, who gives generously to all without reproach, and it will be given him." },
     ]
   },
   {
@@ -422,29 +514,74 @@ const SCRIPTURE_CATEGORIES = [
     subtitle: "this is the mission God gives",
     icon: "\u{1F525}",
     passages: [
-      // God's Plan & Purpose
-      { ref: "Jeremiah 29:11", text: "For I know the plans I have for you, declares the Lord, plans for welfare and not for evil, to give you a future and a hope." },
-      { ref: "Proverbs 19:21", text: "Many are the plans in the mind of a man, but it is the purpose of the Lord that will stand." },
-      { ref: "Isaiah 46:10", text: "Declaring the end from the beginning and from ancient times things not yet done, saying, My counsel shall stand, and I will accomplish all my purpose." },
-      { ref: "Psalm 138:8", text: "The Lord will fulfill his purpose for me; your steadfast love, O Lord, endures forever. Do not forsake the work of your hands." },
-      { ref: "Romans 8:28", text: "And we know that for those who love God all things work together for good, for those who are called according to his purpose." },
-      // Times & Seasons
-      { ref: "Ecclesiastes 3:1", text: "For everything there is a season, and a time for every matter under heaven." },
-      { ref: "Acts 1:7", text: "He said to them, It is not for you to know times or seasons that the Father has fixed by his own authority." },
-      { ref: "Habakkuk 2:3", text: "For still the vision awaits its appointed time; it hastens to the end -- it will not lie. If it seems slow, wait for it; it will surely come; it will not delay." },
-      { ref: "Psalm 31:15", text: "My times are in your hand; rescue me from the hand of my enemies and from my persecutors!" },
-      { ref: "Galatians 6:9", text: "And let us not grow weary of doing good, for in due season we will reap, if we do not give up." },
-      { ref: "Isaiah 60:22", text: "The least one shall become a clan, and the smallest one a mighty nation; I am the Lord; in its time I will hasten it." },
-      // Mission & Calling
-      { ref: "Joshua 1:8-9", text: "This Book of the Law shall not depart from your mouth, but you shall meditate on it day and night, so that you may be careful to do according to all that is written in it. For then you will make your way prosperous, and then you will have good success. Have I not commanded you? Be strong and courageous. Do not be frightened, and do not be dismayed, for the Lord your God is with you wherever you go." },
-      { ref: "Matthew 28:19-20", text: "Go therefore and make disciples of all nations, baptizing them in the name of the Father and of the Son and of the Holy Spirit, teaching them to observe all that I have commanded you. And behold, I am with you always, to the end of the age." },
-      { ref: "Isaiah 6:8", text: "And I heard the voice of the Lord saying, Whom shall I send, and who will go for us? Then I said, Here I am! Send me." },
-      { ref: "Micah 6:8", text: "He has told you, O man, what is good; and what does the Lord require of you but to do justice, and to love kindness, and to walk humbly with your God?" },
-      // Courage & Strength for the Assignment
-      { ref: "2 Timothy 1:7", text: "For God gave us a spirit not of fear but of power and love and self-control." },
-      { ref: "Ephesians 6:10-11", text: "Finally, be strong in the Lord and in the strength of his might. Put on the whole armor of God, that you may be able to stand against the schemes of the devil." },
+      // ── Torah — courage and obedience ──
+      { ref: "Genesis 1:28", text: "And God blessed them. And God said to them, Be fruitful and multiply and fill the earth and subdue it, and have dominion over the fish of the sea and over the birds of the heavens and over every living thing that moves on the earth." },
+      { ref: "Deuteronomy 28:13", text: "And the Lord will make you the head and not the tail, and you shall only go up and not down, if you obey the commandments of the Lord your God, which I command you today, being careful to do them." },
       { ref: "Deuteronomy 31:6", text: "Be strong and courageous. Do not fear or be in dread of them, for it is the Lord your God who goes with you. He will not leave you or forsake you." },
+      { ref: "Deuteronomy 31:8", text: "It is the Lord who goes before you. He will be with you; he will not leave you or forsake you. Do not fear or be dismayed." },
+      // ── History ──
+      { ref: "Joshua 1:8-9", text: "This Book of the Law shall not depart from your mouth, but you shall meditate on it day and night, so that you may be careful to do according to all that is written in it. For then you will make your way prosperous, and then you will have good success. Have I not commanded you? Be strong and courageous. Do not be frightened, and do not be dismayed, for the Lord your God is with you wherever you go." },
+      { ref: "1 Samuel 17:47", text: "And that all this assembly may know that the Lord saves not with sword and spear. For the battle is the Lord's, and he will give you into our hand." },
+      { ref: "1 Chronicles 4:10", text: "Jabez called upon the God of Israel, saying, Oh that you would bless me and enlarge my border, and that your hand might be with me, and that you would keep me from harm so that it might not bring me pain! And God granted what he asked." },
+      { ref: "2 Chronicles 20:15", text: "And he said, Listen, all Judah and inhabitants of Jerusalem and King Jehoshaphat: Thus says the Lord to you, Do not be afraid and do not be dismayed at this great horde, for the battle is not yours but God's." },
       { ref: "Esther 4:14", text: "For if you keep silent at this time, relief and deliverance will rise for the Jews from another place, but you and your father's house will perish. And who knows whether you have not come to the kingdom for such a time as this?" },
+      // ── Psalms — guidance, purpose, times, boldness ──
+      { ref: "Psalm 2:8", text: "Ask of me, and I will make the nations your heritage, and the ends of the earth your possession." },
+      { ref: "Psalm 5:12", text: "For you bless the righteous, O Lord; you cover him with favor as with a shield." },
+      { ref: "Psalm 18:29", text: "For by you I can run against a troop, and by my God I can leap over a wall." },
+      { ref: "Psalm 20:4", text: "May he grant you your heart's desire and fulfill all your plans!" },
+      { ref: "Psalm 25:4-5", text: "Make me to know your ways, O Lord; teach me your paths. Lead me in your truth and teach me, for you are the God of my salvation; for you I wait all the day long." },
+      { ref: "Psalm 31:15", text: "My times are in your hand; rescue me from the hand of my enemies and from my persecutors!" },
+      { ref: "Psalm 32:8", text: "I will instruct you and teach you in the way you should go; I will counsel you with my eye upon you." },
+      { ref: "Psalm 37:5-6", text: "Commit your way to the Lord; trust in him, and he will act. He will bring forth your righteousness as the light, and your justice as the noonday." },
+      { ref: "Psalm 37:23-24", text: "The steps of a man are established by the Lord, when he delights in his way; though he fall, he shall not be cast headlong, for the Lord upholds his hand." },
+      { ref: "Psalm 57:2", text: "I cry out to God Most High, to God who fulfills his purpose for me." },
+      { ref: "Psalm 90:12", text: "So teach us to number our days that we may get a heart of wisdom." },
+      { ref: "Psalm 110:1-3", text: "The Lord says to my Lord: Sit at my right hand, until I make your enemies your footstool. The Lord sends forth from Zion your mighty scepter. Rule in the midst of your enemies! Your people will offer themselves freely on the day of your power, in holy garments; from the womb of the morning, the dew of your youth will be yours." },
+      { ref: "Psalm 126:5-6", text: "Those who sow in tears shall reap with shouts of joy! He who goes out weeping, bearing the seed for sowing, shall come home with shouts of joy, bringing his sheaves with him." },
+      { ref: "Psalm 138:8", text: "The Lord will fulfill his purpose for me; your steadfast love, O Lord, endures forever. Do not forsake the work of your hands." },
+      // ── Proverbs — diligence, calling, purpose, leadership ──
+      { ref: "Proverbs 3:27", text: "Do not withhold good from those to whom it is due, when it is in your power to do it." },
+      { ref: "Proverbs 11:30", text: "The fruit of the righteous is a tree of life, and whoever captures souls is wise." },
+      { ref: "Proverbs 14:23", text: "In all toil there is profit, but mere talk tends only to poverty." },
+      { ref: "Proverbs 16:1", text: "The plans of the heart belong to man, but the answer of the tongue is from the Lord." },
+      { ref: "Proverbs 16:9", text: "The heart of man plans his way, but the Lord establishes his steps." },
+      { ref: "Proverbs 18:16", text: "A man's gift makes room for him and brings him before great men." },
+      { ref: "Proverbs 19:21", text: "Many are the plans in the mind of a man, but it is the purpose of the Lord that will stand." },
+      { ref: "Proverbs 22:29", text: "Do you see a man skillful in his work? He will stand before kings; he will not stand before obscure men." },
+      { ref: "Proverbs 29:18", text: "Where there is no prophetic vision the people cast off restraint, but blessed is he who keeps the law." },
+      // ── Prophets — mission, calling, times, nations ──
+      { ref: "Ecclesiastes 3:1", text: "For everything there is a season, and a time for every matter under heaven." },
+      { ref: "Ecclesiastes 3:11", text: "He has made everything beautiful in its time. Also, he has put eternity into man's heart, yet so that he cannot find out what God has done from the beginning to the end." },
+      { ref: "Ecclesiastes 9:10", text: "Whatever your hand finds to do, do it with your might, for there is no work or thought or knowledge or wisdom in Sheol, to which you are going." },
+      { ref: "Isaiah 6:8", text: "And I heard the voice of the Lord saying, Whom shall I send, and who will go for us? Then I said, Here I am! Send me." },
+      { ref: "Isaiah 46:10", text: "Declaring the end from the beginning and from ancient times things not yet done, saying, My counsel shall stand, and I will accomplish all my purpose." },
+      { ref: "Isaiah 55:11", text: "So shall my word be that goes out from my mouth; it shall not return to me empty, but it shall accomplish that which I purpose, and shall succeed in the thing for which I sent it." },
+      { ref: "Isaiah 60:1-3", text: "Arise, shine, for your light has come, and the glory of the Lord has risen upon you. For behold, darkness shall cover the earth, and thick darkness the peoples; but the Lord will arise upon you, and his glory will be seen upon you. And nations shall come to your light, and kings to the brightness of your rising." },
+      { ref: "Isaiah 60:22", text: "The least one shall become a clan, and the smallest one a mighty nation; I am the Lord; in its time I will hasten it." },
+      { ref: "Jeremiah 1:7-8", text: "But the Lord said to me, Do not say, I am only a youth; for to all to whom I send you, you shall go, and whatever I command you, you shall speak. Do not be afraid of them, for I am with you to deliver you, declares the Lord." },
+      { ref: "Jeremiah 29:11", text: "For I know the plans I have for you, declares the Lord, plans for welfare and not for evil, to give you a future and a hope." },
+      { ref: "Habakkuk 2:3", text: "For still the vision awaits its appointed time; it hastens to the end -- it will not lie. If it seems slow, wait for it; it will surely come; it will not delay." },
+      { ref: "Micah 6:8", text: "He has told you, O man, what is good; and what does the Lord require of you but to do justice, and to love kindness, and to walk humbly with your God?" },
+      { ref: "Zechariah 4:6", text: "Then he said to me, This is the word of the Lord to Zerubbabel: Not by might, nor by power, but by my Spirit, says the Lord of hosts." },
+      // ── Gospels ──
+      { ref: "Matthew 5:14-16", text: "You are the light of the world. A city set on a hill cannot be hidden. Nor do people light a lamp and put it under a basket, but on a stand, and it gives light to all in the house. In the same way, let your light shine before others, so that they may see your good works and give glory to your Father who is in heaven." },
+      { ref: "Matthew 28:18-20", text: "And Jesus came and said to them, All authority in heaven and on earth has been given to me. Go therefore and make disciples of all nations, baptizing them in the name of the Father and of the Son and of the Holy Spirit, teaching them to observe all that I have commanded you. And behold, I am with you always, to the end of the age." },
+      { ref: "Mark 16:15", text: "And he said to them, Go into all the world and proclaim the gospel to the whole creation." },
+      { ref: "Luke 4:18-19", text: "The Spirit of the Lord is upon me, because he has anointed me to proclaim good news to the poor. He has sent me to proclaim liberty to the captives and recovering of sight to the blind, to set at liberty those who are oppressed, to proclaim the year of the Lord's favor." },
+      { ref: "John 15:16", text: "You did not choose me, but I chose you and appointed you that you should go and bear fruit and that your fruit should abide, so that whatever you ask the Father in my name, he may give it to you." },
+      // ── Epistles ──
+      { ref: "Acts 1:8", text: "But you will receive power when the Holy Spirit has come upon you, and you will be my witnesses in Jerusalem and in all Judea and Samaria, and to the end of the earth." },
+      { ref: "Acts 17:26-27", text: "And he made from one man every nation of mankind to live on all the face of the earth, having determined allotted periods and the boundaries of their dwelling place, that they should seek God, and perhaps feel their way toward him and find him." },
+      { ref: "Romans 8:28", text: "And we know that for those who love God all things work together for good, for those who are called according to his purpose." },
+      { ref: "1 Corinthians 15:58", text: "Therefore, my beloved brothers, be steadfast, immovable, always abounding in the work of the Lord, knowing that in the Lord your labor is not in vain." },
+      { ref: "Galatians 6:9", text: "And let us not grow weary of doing good, for in due season we will reap, if we do not give up." },
+      { ref: "Ephesians 2:10", text: "For we are his workmanship, created in Christ Jesus for good works, which God prepared beforehand, that we should walk in them." },
+      { ref: "Ephesians 6:10-11", text: "Finally, be strong in the Lord and in the strength of his might. Put on the whole armor of God, that you may be able to stand against the schemes of the devil." },
+      { ref: "Colossians 3:23-24", text: "Whatever you do, work heartily, as for the Lord and not for men, knowing that from the Lord you will receive the inheritance as your reward. You are serving the Lord Christ." },
+      { ref: "2 Timothy 1:7", text: "For God gave us a spirit not of fear but of power and love and self-control." },
+      { ref: "2 Timothy 4:7", text: "I have fought the good fight, I have finished the race, I have kept the faith." },
+      { ref: "Hebrews 12:1-2", text: "Therefore, since we are surrounded by so great a cloud of witnesses, let us also lay aside every weight, and sin which clings so closely, and let us run with endurance the race that is set before us, looking to Jesus, the founder and perfecter of our faith." },
     ]
   },
 ];
@@ -668,6 +805,26 @@ export default function Renew() {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [permissionDenied, setPermissionDenied] = useState(false);
 
+  // ─── Authentication ───
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [authScreen, setAuthScreen] = useState("login"); // "login" | "signup"
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authError, setAuthError] = useState("");
+  const [authBusy, setAuthBusy] = useState(false);
+  const cloudSaveTimer = useRef(null);
+  const dataLoadedRef = useRef(false);
+
+  // Listen for Firebase auth state
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (u) => {
+      setUser(u);
+      setAuthLoading(false);
+    });
+    return unsub;
+  }, []);
+
   // ─── Per-passage persistent neural networks ───
   // Map: passage ref string → { neurons: [...serialized], synapses: [...serialized], nextId, totalSpeakTime }
   const passageNetworksRef = useRef({});
@@ -680,6 +837,106 @@ export default function Renew() {
 
   // Helper: check if first time (no sessions and no lifetime data)
   const isFirstTime = sessionHistory.length === 0 && lifetimeSeconds === 0;
+
+  // ─── Cloud Sync: Load data from Firestore on login ───
+  useEffect(() => {
+    if (!user || dataLoadedRef.current) return;
+    const loadCloud = async () => {
+      try {
+        const snap = await getDoc(doc(db, "users", user.uid));
+        if (snap.exists()) {
+          const d = snap.data();
+          if (d.sessionHistory) setSessionHistory(d.sessionHistory);
+          if (d.currentStreak !== undefined) setCurrentStreak(d.currentStreak);
+          if (d.longestStreak !== undefined) setLongestStreak(d.longestStreak);
+          if (d.lifetimeSeconds !== undefined) setLifetimeSeconds(d.lifetimeSeconds);
+          if (d.lifetimeNeurons !== undefined) setLifetimeNeurons(d.lifetimeNeurons);
+          if (d.passageNetworks) passageNetworksRef.current = d.passageNetworks;
+        }
+        dataLoadedRef.current = true;
+      } catch (e) {
+        console.warn("Cloud load failed, using local state:", e);
+        dataLoadedRef.current = true;
+      }
+    };
+    loadCloud();
+  }, [user]);
+
+  // ─── Cloud Sync: Save data to Firestore (debounced) ───
+  const saveToCloud = useCallback(() => {
+    if (!user || !dataLoadedRef.current) return;
+    // Debounce: wait 3s after last change before writing
+    if (cloudSaveTimer.current) clearTimeout(cloudSaveTimer.current);
+    cloudSaveTimer.current = setTimeout(async () => {
+      try {
+        await setDoc(doc(db, "users", user.uid), {
+          sessionHistory,
+          currentStreak,
+          longestStreak,
+          lifetimeSeconds,
+          lifetimeNeurons,
+          passageNetworks: passageNetworksRef.current,
+          lastSaved: new Date().toISOString(),
+          email: user.email || "",
+        }, { merge: true });
+      } catch (e) {
+        console.warn("Cloud save failed:", e);
+      }
+    }, 3000);
+  }, [user, sessionHistory, currentStreak, longestStreak, lifetimeSeconds, lifetimeNeurons]);
+
+  // Trigger cloud save whenever key data changes
+  useEffect(() => {
+    saveToCloud();
+  }, [sessionHistory, currentStreak, longestStreak, lifetimeSeconds, lifetimeNeurons, saveToCloud]);
+
+  // ─── Auth helpers ───
+  const handleGoogleSignIn = async () => {
+    setAuthError(""); setAuthBusy(true);
+    try { await signInWithPopup(auth, googleProvider); }
+    catch (e) { setAuthError(e.message); }
+    setAuthBusy(false);
+  };
+
+  const handleEmailAuth = async () => {
+    setAuthError(""); setAuthBusy(true);
+    try {
+      if (authScreen === "signup") {
+        await createUserWithEmailAndPassword(auth, authEmail, authPassword);
+      } else {
+        await signInWithEmailAndPassword(auth, authEmail, authPassword);
+      }
+    } catch (e) {
+      const msg = e.code === "auth/user-not-found" ? "No account found with this email."
+        : e.code === "auth/wrong-password" ? "Incorrect password."
+        : e.code === "auth/email-already-in-use" ? "An account already exists with this email."
+        : e.code === "auth/weak-password" ? "Password must be at least 6 characters."
+        : e.code === "auth/invalid-email" ? "Please enter a valid email address."
+        : e.message;
+      setAuthError(msg);
+    }
+    setAuthBusy(false);
+  };
+
+  const handleSignOut = async () => {
+    // Save before signing out
+    if (user && dataLoadedRef.current) {
+      try {
+        await setDoc(doc(db, "users", user.uid), {
+          sessionHistory, currentStreak, longestStreak, lifetimeSeconds, lifetimeNeurons,
+          passageNetworks: passageNetworksRef.current,
+          lastSaved: new Date().toISOString(),
+        }, { merge: true });
+      } catch {}
+    }
+    dataLoadedRef.current = false;
+    await signOut(auth);
+    // Reset local state
+    setSessionHistory([]); setCurrentStreak(0); setLongestStreak(0);
+    setLifetimeSeconds(0); setLifetimeNeurons(0);
+    passageNetworksRef.current = {};
+    setScreen("home");
+  };
 
   // Helper: get the passage key
   const getPassageKey = (p) => p ? (p.ref || "Custom") : "Custom";
@@ -1658,20 +1915,13 @@ export default function Renew() {
         </div>
       )}
 
-      {/* Streak — top right corner with flicker animation */}
-      {currentStreak > 0 && (
-        <div style={{
-          position: "absolute", top: "max(20px, env(safe-area-inset-top, 20px))", right: "max(22px, env(safe-area-inset-right, 22px))",
-          display: "flex", alignItems: "center", gap: 5,
-          cursor: "pointer",
-          animation: "renewStreakFlicker 3s ease-in-out infinite",
-        }} onClick={() => setScreen("history")}>
-          <span style={{ color: P.streak, fontSize: 18, fontWeight: 800, fontFamily: FONT, lineHeight: 1 }}>
-            {currentStreak}
-          </span>
-          <span style={{ fontSize: 12, lineHeight: 1 }}>{"\u{1F525}"}</span>
-        </div>
-      )}
+      {/* Sign out — top right, subtle */}
+      <button onClick={handleSignOut} style={{
+        position: "absolute", top: "max(20px, env(safe-area-inset-top, 20px))", right: "max(22px, env(safe-area-inset-right, 22px))",
+        background: "none", border: "none", color: P.textDim, fontSize: 9,
+        cursor: "pointer", fontFamily: FONT, letterSpacing: 1, padding: "4px 0",
+        transition: "color 0.3s",
+      }}>SIGN OUT</button>
 
       <div style={{
         animation: "renewFadeInUp 1.2s cubic-bezier(0.22, 1, 0.36, 1) both",
@@ -2188,7 +2438,10 @@ export default function Renew() {
         }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div>
-              <div style={{ color: P.streak, fontSize: 14, fontWeight: 700, fontFamily: FONT, animation: "renewStreakFlicker 3s ease-in-out infinite" }}>{currentStreak} day streak</div>
+              <div style={{ color: P.streak, fontSize: 13, fontWeight: 700, fontFamily: FONT, animation: "renewStreakFlicker 3s ease-in-out infinite", display: "flex", alignItems: "center", gap: 5 }}>
+                {currentStreak} day streak
+                <span style={{ fontSize: 10, lineHeight: 1 }}>{"\u{1F525}"}</span>
+              </div>
               <div style={{ color: P.textDim, fontSize: 9, fontFamily: FONT }}>best: {longestStreak} days</div>
             </div>
             <div style={{ textAlign: "right" }}>
@@ -2322,6 +2575,169 @@ export default function Renew() {
   );
 
   // Screen content wrapper with transition animation
+  // ─── Auth Screen ───
+  if (authLoading) {
+    return (
+      <div style={{ background: "#000", width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{
+          width: 9, height: 9, borderRadius: "50%",
+          background: "radial-gradient(circle, #A5B4FC, #6366F1)",
+          boxShadow: "0 0 30px rgba(165,180,252,0.5), 0 0 60px rgba(124,106,255,0.2)",
+          animation: "renewPulseGlow 2s ease-in-out infinite",
+        }} />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="renew-noise" style={{
+        background: "#000", width: "100%", height: "100%",
+        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+        padding: "0 32px", fontFamily: FONT, position: "relative", overflow: "hidden",
+      }}>
+        {/* Breathing fog */}
+        <div style={{
+          position: "absolute", inset: 0, pointerEvents: "none",
+          background: "radial-gradient(ellipse at 50% 40%, rgba(124,106,255,0.06) 0%, transparent 65%)",
+          animation: "renewFogBreathe 12s ease-in-out infinite",
+        }} />
+
+        {/* Logo */}
+        <div style={{
+          width: 44, height: 44, borderRadius: "50%",
+          background: "radial-gradient(circle, rgba(165,180,252,0.18), rgba(79,70,229,0.06) 60%, transparent 80%)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          marginBottom: 14,
+          animation: "renewLogoEntrance 1.4s cubic-bezier(0.22, 1, 0.36, 1) both",
+        }}>
+          <div style={{
+            width: 9, height: 9, borderRadius: "50%",
+            background: "radial-gradient(circle, #A5B4FC, #6366F1)",
+            boxShadow: "0 0 20px rgba(165,180,252,0.5), 0 0 40px rgba(124,106,255,0.15)",
+          }} />
+        </div>
+
+        <h1 style={{
+          color: "#fff", fontSize: 15, fontWeight: 700, margin: 0,
+          letterSpacing: 8, textTransform: "uppercase", fontFamily: FONT,
+          animation: "renewFadeInUp 1s cubic-bezier(0.22, 1, 0.36, 1) both",
+          animationDelay: "0.2s", marginBottom: 6,
+        }}>RENEW</h1>
+
+        <p style={{
+          color: P.textSoft, fontSize: 12, fontWeight: 300, fontFamily: FONT_BODY,
+          marginBottom: 32, textAlign: "center", lineHeight: 1.6,
+          animation: "renewFadeInUp 1s cubic-bezier(0.22, 1, 0.36, 1) both",
+          animationDelay: "0.4s",
+        }}>
+          speak the Word &middot; renew your mind
+        </p>
+
+        {/* Auth form */}
+        <div style={{
+          width: "100%", maxWidth: 320,
+          animation: "renewFadeInUp 1s cubic-bezier(0.22, 1, 0.36, 1) both",
+          animationDelay: "0.6s",
+        }}>
+          {/* Google sign-in */}
+          <button className="renew-btn-tap" onClick={handleGoogleSignIn} disabled={authBusy} style={{
+            width: "100%", padding: "14px 20px", fontSize: 13, fontWeight: 600,
+            fontFamily: FONT, letterSpacing: 0.5, cursor: "pointer",
+            background: "#fff", color: "#333", border: "none", borderRadius: 10,
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+            boxShadow: "0 2px 12px rgba(0,0,0,0.2)",
+            opacity: authBusy ? 0.6 : 1,
+            transition: "all 0.3s cubic-bezier(0.22, 1, 0.36, 1)",
+          }}>
+            <svg width="18" height="18" viewBox="0 0 24 24">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/>
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+            </svg>
+            Continue with Google
+          </button>
+
+          {/* Divider */}
+          <div style={{
+            display: "flex", alignItems: "center", gap: 12, margin: "20px 0",
+          }}>
+            <div style={{ flex: 1, height: 1, background: P.cardBorder }} />
+            <span style={{ color: P.textDim, fontSize: 10, fontFamily: FONT, letterSpacing: 1 }}>OR</span>
+            <div style={{ flex: 1, height: 1, background: P.cardBorder }} />
+          </div>
+
+          {/* Email / Password */}
+          <input className="renew-input" value={authEmail} onChange={e => setAuthEmail(e.target.value)}
+            placeholder="Email address" type="email"
+            style={{
+              width: "100%", boxSizing: "border-box", marginBottom: 10,
+              background: P.surface, border: `1px solid ${P.cardBorder}`,
+              borderRadius: 10, padding: "13px 16px", color: P.text, fontSize: 13,
+              fontFamily: FONT_BODY, outline: "none",
+              transition: "border-color 0.3s, box-shadow 0.3s",
+            }}
+            onKeyDown={e => e.key === "Enter" && handleEmailAuth()}
+          />
+          <input className="renew-input" value={authPassword} onChange={e => setAuthPassword(e.target.value)}
+            placeholder="Password" type="password"
+            style={{
+              width: "100%", boxSizing: "border-box", marginBottom: 14,
+              background: P.surface, border: `1px solid ${P.cardBorder}`,
+              borderRadius: 10, padding: "13px 16px", color: P.text, fontSize: 13,
+              fontFamily: FONT_BODY, outline: "none",
+              transition: "border-color 0.3s, box-shadow 0.3s",
+            }}
+            onKeyDown={e => e.key === "Enter" && handleEmailAuth()}
+          />
+
+          {authError && (
+            <div style={{
+              color: P.danger, fontSize: 11, fontFamily: FONT_BODY, marginBottom: 12,
+              textAlign: "center", lineHeight: 1.5,
+            }}>{authError}</div>
+          )}
+
+          <button className="renew-btn-tap" onClick={handleEmailAuth} disabled={authBusy || !authEmail || !authPassword} style={{
+            background: "linear-gradient(135deg, #7C6AFF 0%, #6355D8 100%)",
+            color: "#fff", border: "none", borderRadius: 10,
+            padding: "14px 36px", fontSize: 13, fontWeight: 600, cursor: "pointer",
+            fontFamily: FONT, letterSpacing: 1, textTransform: "uppercase",
+            boxShadow: "0 0 30px rgba(124,106,255,0.15), 0 2px 8px rgba(0,0,0,0.3)",
+            width: "100%", textAlign: "center",
+            opacity: (authBusy || !authEmail || !authPassword) ? 0.5 : 1,
+            transition: "all 0.4s cubic-bezier(0.22, 1, 0.36, 1)",
+          }}>
+            {authBusy ? "..." : authScreen === "signup" ? "Create Account" : "Sign In"}
+          </button>
+
+          <button onClick={() => { setAuthScreen(authScreen === "login" ? "signup" : "login"); setAuthError(""); }} style={{
+            background: "none", border: "none", color: P.accent, fontSize: 11,
+            cursor: "pointer", fontFamily: FONT_BODY, marginTop: 16,
+            letterSpacing: 0.3, width: "100%", textAlign: "center",
+          }}>
+            {authScreen === "login" ? "Don't have an account? Sign up" : "Already have an account? Sign in"}
+          </button>
+        </div>
+
+        {/* Footer */}
+        <div style={{
+          position: "absolute", bottom: "max(20px, env(safe-area-inset-bottom, 20px))",
+          left: 20, right: 20, textAlign: "center",
+          animation: "renewBreathe 8s cubic-bezier(0.37, 0, 0.63, 1) infinite",
+        }}>
+          <div style={{ color: P.textGhost, fontSize: 9, fontStyle: "italic", lineHeight: 1.6, fontFamily: FONT_BODY }}>
+            "This Book of the Law shall not depart from your mouth..."
+          </div>
+          <div style={{ color: P.textGhost, fontSize: 8, marginTop: 4, fontWeight: 700, letterSpacing: 2, fontFamily: FONT }}>
+            JOSHUA 1:8
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const screenContent = (() => {
     switch (screen) {
       case "home": return renderHome();
