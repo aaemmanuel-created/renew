@@ -4,15 +4,247 @@ import * as Tone from "tone";
 // ─── Neural Network Simulation ───
 // Joshua 1:8 — "This Book of the Law shall not depart from your mouth..."
 
-// ─── Load JetBrains Mono ───
+// ─── Load JetBrains Mono + Inter ───
 const fontLink = document.createElement("link");
-fontLink.href = "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@200;300;400;500;600;700;800&display=swap";
+fontLink.href = "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@200;300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap";
 fontLink.rel = "stylesheet";
 if (!document.head.querySelector('link[href*="JetBrains+Mono"]')) {
   document.head.appendChild(fontLink);
 }
 
 const FONT = "'JetBrains Mono', monospace";
+const FONT_BODY = "'Inter', -apple-system, sans-serif"; // For scripture text & body copy
+
+// ─── Inject CSS Keyframe Animations ───
+const STYLE_ID = "renew-keyframes";
+if (!document.getElementById(STYLE_ID)) {
+  const styleEl = document.createElement("style");
+  styleEl.id = STYLE_ID;
+  styleEl.textContent = `
+    /* ── Silk-smooth easing curves ── */
+    /* Soft deceleration — like settling into place */
+    /* cubic-bezier(0.22, 1, 0.36, 1) = smooth overshoot-free ease-out */
+    /* cubic-bezier(0.0, 0, 0.2, 1)  = Material-style decelerate */
+
+    @keyframes renewFadeInUp {
+      0% {
+        opacity: 0;
+        transform: translateY(18px) scale(0.97);
+        filter: blur(12px);
+      }
+      40% {
+        opacity: 0.6;
+        filter: blur(4px);
+      }
+      100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        filter: blur(0px);
+      }
+    }
+    @keyframes renewFadeIn {
+      0% { opacity: 0; filter: blur(10px); }
+      50% { opacity: 0.7; filter: blur(3px); }
+      100% { opacity: 1; filter: blur(0px); }
+    }
+    @keyframes renewBreathe {
+      0%, 100% { opacity: 0.25; }
+      50% { opacity: 0.55; }
+    }
+    @keyframes renewPulseGlow {
+      0%, 100% { box-shadow: 0 0 20px rgba(124, 106, 255, 0.12), 0 0 50px rgba(124, 106, 255, 0.04); }
+      50% { box-shadow: 0 0 28px rgba(124, 106, 255, 0.22), 0 0 60px rgba(124, 106, 255, 0.08); }
+    }
+    @keyframes renewStatusPulse {
+      0%, 100% { opacity: 0.65; }
+      50% { opacity: 1; }
+    }
+    @keyframes renewStaggerIn {
+      0% {
+        opacity: 0;
+        transform: translateY(14px) scale(0.97);
+        filter: blur(10px);
+      }
+      50% {
+        opacity: 0.7;
+        filter: blur(2px);
+      }
+      100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        filter: blur(0px);
+      }
+    }
+    @keyframes renewShimmer {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
+    @keyframes renewStreakFlicker {
+      0%, 100% { opacity: 0.7; text-shadow: 0 0 4px rgba(251,146,60,0.3); }
+      25% { opacity: 0.9; text-shadow: 0 0 8px rgba(251,146,60,0.5); }
+      50% { opacity: 1; text-shadow: 0 0 12px rgba(251,146,60,0.6); }
+      75% { opacity: 0.85; text-shadow: 0 0 6px rgba(251,146,60,0.4); }
+    }
+    @keyframes renewLogoEntrance {
+      0% {
+        opacity: 0;
+        transform: scale(0.5) translateY(14px);
+        filter: blur(16px);
+      }
+      50% {
+        opacity: 0.7;
+        transform: scale(1.02) translateY(-1px);
+        filter: blur(3px);
+      }
+      100% {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+        filter: blur(0px);
+      }
+    }
+    @keyframes renewDividerGrow {
+      0% { width: 0; opacity: 0; }
+      100% { width: 32px; opacity: 1; }
+    }
+    @keyframes renewCountUp {
+      0% {
+        opacity: 0;
+        transform: translateY(12px) scale(0.95);
+        filter: blur(12px);
+      }
+      45% {
+        opacity: 0.6;
+        filter: blur(3px);
+      }
+      100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        filter: blur(0px);
+      }
+    }
+    /* Soft float-in for screen transitions */
+    @keyframes renewScreenEnter {
+      0% {
+        opacity: 0;
+        transform: translateY(10px);
+        filter: blur(14px);
+      }
+      45% {
+        opacity: 0.65;
+        filter: blur(4px);
+      }
+      100% {
+        opacity: 1;
+        transform: translateY(0);
+        filter: blur(0px);
+      }
+    }
+    /* v2: Divider shimmer — light catching a wire */
+    @keyframes renewDividerShimmer {
+      0% { background-position: -100px 0; }
+      100% { background-position: 100px 0; }
+    }
+    /* v2: Achievement flash — stat glow on reveal */
+    @keyframes renewAchievementFlash {
+      0% {
+        opacity: 0;
+        transform: translateY(10px) scale(0.95);
+        filter: blur(8px);
+        text-shadow: none;
+      }
+      50% {
+        opacity: 1;
+        text-shadow: 0 0 18px currentColor;
+        filter: blur(0px);
+      }
+      100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        filter: blur(0px);
+        text-shadow: 0 0 6px currentColor;
+      }
+    }
+    /* v2: Radial burst behind summary */
+    @keyframes renewRadialBurst {
+      0% {
+        opacity: 0;
+        transform: scale(0.5);
+      }
+      40% {
+        opacity: 0.12;
+      }
+      100% {
+        opacity: 0.06;
+        transform: scale(1);
+      }
+    }
+    /* v2: Concentric rings expanding */
+    @keyframes renewRingExpand {
+      0% { transform: scale(0.3); opacity: 0.2; }
+      100% { transform: scale(1.2); opacity: 0; }
+    }
+    /* v2: Breathing fog on home */
+    @keyframes renewFogBreathe {
+      0%, 100% { opacity: 0.6; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.05); }
+    }
+    /* v2: Scroll edge fades */
+    .renew-scroll-container {
+      position: relative;
+      scroll-behavior: smooth;
+      -webkit-overflow-scrolling: touch;
+    }
+    .renew-scroll-container::before,
+    .renew-scroll-container::after {
+      content: '';
+      position: sticky;
+      display: block;
+      left: 0;
+      right: 0;
+      height: 32px;
+      pointer-events: none;
+      z-index: 5;
+    }
+    .renew-scroll-container::before {
+      top: 0;
+      background: linear-gradient(to bottom, rgba(0,0,0,0.9), transparent);
+    }
+    .renew-scroll-container::after {
+      bottom: 0;
+      background: linear-gradient(to top, rgba(0,0,0,0.9), transparent);
+    }
+    /* v2: Input focus glow */
+    .renew-input:focus {
+      border-color: rgba(124, 106, 255, 0.4) !important;
+      box-shadow: 0 0 16px rgba(124, 106, 255, 0.1), inset 0 0 8px rgba(124, 106, 255, 0.03) !important;
+    }
+    /* Noise texture overlay */
+    .renew-noise::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      opacity: 0.025;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+      background-repeat: repeat;
+      background-size: 256px 256px;
+      pointer-events: none;
+      z-index: 1;
+    }
+    /* Button tap feedback — silk-smooth */
+    .renew-btn-tap {
+      transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.4s ease, opacity 0.3s ease;
+      will-change: transform;
+    }
+    .renew-btn-tap:active { transform: scale(0.96) !important; }
+    /* Smooth scrolling for passage lists */
+    .renew-smooth-scroll { scroll-behavior: smooth; -webkit-overflow-scrolling: touch; }
+    /* Screen transitions — silk float-in */
+    .renew-screen-enter {
+      animation: renewScreenEnter 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+  `;
+  document.head.appendChild(styleEl);
+}
 
 // ─── Palette: pure black + cool accents ───
 const P = {
@@ -146,6 +378,13 @@ const SCRIPTURE_CATEGORIES = [
       { ref: "Romans 12:1", text: "I appeal to you therefore, brothers, by the mercies of God, to present your bodies as a living sacrifice, holy and acceptable to God, which is your spiritual worship." },
       // Spirit, Soul & Body
       { ref: "1 Thessalonians 5:23", text: "Now may the God of peace himself sanctify you completely, and may your whole spirit and soul and body be kept blameless at the coming of our Lord Jesus Christ." },
+      // Praise & Worship
+      { ref: "Psalm 146:1-2", text: "Praise the Lord! Praise the Lord, O my soul! I will praise the Lord as long as I live; I will sing praises to my God while I have my being." },
+      // Peace & Mind
+      { ref: "Isaiah 26:3", text: "You keep him in perfect peace whose mind is stayed on you, because he trusts in you." },
+      { ref: "Isaiah 26:7", text: "The path of the righteous is level; you make level the way of the righteous." },
+      // Character & Conduct
+      { ref: "James 1:19-21", text: "Know this, my beloved brothers: let every person be quick to hear, slow to speak, slow to anger; for the anger of man does not produce the righteousness of God. Therefore put away all filthiness and rampant wickedness and receive with meekness the implanted word, which is able to save your souls." },
     ]
   },
   {
@@ -412,6 +651,7 @@ export default function Renew() {
   const sessionStartRef = useRef({ neurons: 0, synapses: 0, dendrites: 0, speakTime: 0 });
   const lastGrowthRef = useRef(null);
 
+  const [appLoaded, setAppLoaded] = useState(false);
   const [screen, setScreen] = useState("home");
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [selectedPassage, setSelectedPassage] = useState(null);
@@ -514,6 +754,12 @@ export default function Renew() {
     return combined;
   }, []);
 
+  // Loading state — brief elegant reveal
+  useEffect(() => {
+    const timer = setTimeout(() => setAppLoaded(true), 600);
+    return () => clearTimeout(timer);
+  }, []);
+
   const speakAccRef = useRef(0);
   const lastFireRef = useRef(0);
 
@@ -545,15 +791,28 @@ export default function Renew() {
     const c = canvasRef.current;
     if (!c) return;
     if (screen === "home") {
-      // Home screen: no network in background — just the void
-      stateRef.current = { neurons: [], synapses: [], nextId: 0, totalSpeakTime: 0, sessionFires: 0 };
-      const ctx2 = c.getContext("2d");
-      if (ctx2) { ctx2.fillStyle = "#000000"; ctx2.fillRect(0, 0, c.width, c.height); }
-    } else if (screen === "summary" || screen === "history") {
+      // Home screen: show faint ambient network if passages have been spoken
+      // Always keep particles visible — even for first-time users the void feels alive
       const combined = buildCombinedState(c.width, c.height);
-      stateRef.current = combined;
-      setNeuronCount(combined.neurons.length);
-      setSynapseCount(combined.synapses.length);
+      if (combined.neurons.length > 1) {
+        // Dim the network for ambient background effect
+        combined.neurons.forEach(n => { n.energy = Math.max(0.08, n.energy * 0.3); n.fireLevel = 0; });
+        stateRef.current = combined;
+      } else {
+        // First-time user — empty network but particles & fog still render
+        stateRef.current = { neurons: [], synapses: [], nextId: 0, totalSpeakTime: 0, sessionFires: 0 };
+      }
+    } else if (screen === "summary" || screen === "history" || screen === "pick-category" || screen === "pick-passage" || screen === "custom") {
+      const combined = buildCombinedState(c.width, c.height);
+      if (combined.neurons.length > 0) {
+        // Dim neurons slightly for background ambient effect
+        if (screen !== "summary") {
+          combined.neurons.forEach(n => { n.energy = Math.max(0.08, n.energy * 0.35); n.fireLevel = 0; });
+        }
+        stateRef.current = combined;
+        setNeuronCount(combined.neurons.length);
+        setSynapseCount(combined.synapses.length);
+      }
     }
   }, [screen, buildCombinedState]);
 
@@ -822,10 +1081,16 @@ export default function Renew() {
         n.x = Math.max(20, Math.min(w - 20, n.x));
         n.y = Math.max(60, Math.min(h - 60, n.y));
         n.fireLevel *= 0.993;
-        // Animate dendrite growth — slowly extend toward targetLength
+        // Animate dendrite growth — slowly extend toward targetLength with unfurling curve
         for (const d of n.dendrites) {
           if (d.targetLength && d.length < d.targetLength) {
             d.length = Math.min(d.targetLength, d.length + 0.15); // slow organic extension
+            // Unfurling: curves deepen as dendrite extends, like a plant growing toward light
+            const growthPct = d.length / d.targetLength;
+            if (growthPct < 0.8) {
+              d.curve1 += (Math.random() - 0.5) * 0.02;
+              d.curve2 += (Math.random() - 0.5) * 0.02;
+            }
           }
         }
         n.maturity = Math.min(1, n.maturity + 0.0002); // new neurons take ~80 seconds to fully appear
@@ -874,14 +1139,16 @@ export default function Renew() {
       }
 
       // ─── RENDER ───
-      ctx.fillStyle = "rgba(0, 0, 0, 0.08)"; // barely fading — light persists in the void
+      // Adaptive trail: ethereal ghost trails when speaking, cleaner when silent
+      const trailAlpha = isSessionScreen && spk ? 0.05 : 0.12;
+      ctx.fillStyle = `rgba(0, 0, 0, ${trailAlpha})`;
       ctx.fillRect(0, 0, w, h);
 
-      // Subtle depth fog gradient that breathes
+      // Subtle depth fog gradient that breathes — tied to drone rhythm
       const fogGradient = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.max(w, h) * 0.7);
-      const fogOpacity = (0.02 + breath * 0.03) * (isSessionScreen && spk ? 1 : 0.6);
-      fogGradient.addColorStop(0, `${spc.fogRGB}${fogOpacity * 0.08})`);
-      fogGradient.addColorStop(0.5, `${spc.fogRGB}${fogOpacity * 0.04})`);
+      const fogOpacity = (0.025 + breath * 0.045) * (isSessionScreen && spk ? 1.2 : 0.6);
+      fogGradient.addColorStop(0, `${spc.fogRGB}${fogOpacity * 0.1})`);
+      fogGradient.addColorStop(0.4, `${spc.fogRGB}${fogOpacity * 0.05})`);
       fogGradient.addColorStop(1, `${spc.fogRGB}0)`);
       ctx.fillStyle = fogGradient;
       ctx.beginPath(); ctx.arc(w / 2, h / 2, Math.max(w, h), 0, Math.PI * 2); ctx.fill();
@@ -934,14 +1201,18 @@ export default function Renew() {
           ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
         }
 
-        // If forming, draw a reaching growth cone at the tip
+        // If forming, draw a reaching growth cone at the tip — dramatic flash that settles
         if (s.forming) {
           const [tipX, tipY] = bezPt(from.x, from.y, cpx, cpy, to.x, to.y, s.formProgress);
-          const tipGlow = ctx.createRadialGradient(tipX, tipY, 0, tipX, tipY, 8);
-          tipGlow.addColorStop(0, `${sc.brightRGB}0.5)`);
-          tipGlow.addColorStop(0.4, `${sc.fireRGB}0.2)`);
+          // Bright flash at beginning of formation, settles as it completes
+          const formIntensity = 1 - s.formProgress * 0.6;
+          const tipGlowR = 8 + (1 - s.formProgress) * 8; // larger at start
+          const tipGlow = ctx.createRadialGradient(tipX, tipY, 0, tipX, tipY, tipGlowR);
+          tipGlow.addColorStop(0, `rgba(255, 253, 255, ${0.4 * formIntensity})`); // white-hot center
+          tipGlow.addColorStop(0.2, `${sc.brightRGB}${0.5 * formIntensity})`);
+          tipGlow.addColorStop(0.5, `${sc.fireRGB}${0.2 * formIntensity})`);
           tipGlow.addColorStop(1, `${sc.fogRGB}0)`);
-          ctx.fillStyle = tipGlow; ctx.beginPath(); ctx.arc(tipX, tipY, 8, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = tipGlow; ctx.beginPath(); ctx.arc(tipX, tipY, tipGlowR, 0, Math.PI * 2); ctx.fill();
         }
 
         // Soft glow halo along high-strength synapses (skip if forming — no halo until complete)
@@ -1062,9 +1333,9 @@ export default function Renew() {
           }
         }
 
-        // ── Outer glow — wide, luminous, breathes ──
-        const glowR = (r + 25 + fire * 35 + energy * 14) * breathMod;
-        const glow = ctx.createRadialGradient(n.x, n.y, r * 0.3, n.x, n.y, glowR);
+        // ── Outer glow — wide, luminous, breathes — fluorescence microscopy style ──
+        const glowR = (r + 35 + fire * 45 + energy * 18) * breathMod;
+        const glow = ctx.createRadialGradient(n.x, n.y, r * 0.2, n.x, n.y, glowR);
         if (fire > 0.1) {
           glow.addColorStop(0, `${pc.brightRGB}${fire * 0.22 * lum})`);
           glow.addColorStop(0.15, `${pc.midRGB}${fire * 0.12 * lum})`);
@@ -1090,9 +1361,10 @@ export default function Renew() {
         // Very bright soma — near-white center with pillar tint
         const somaGrad = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, r * 1.15);
         if (fire > 0.2) {
-          somaGrad.addColorStop(0, `rgba(255, ${pc.soma[1]}, 255, ${(0.6 + fire * 0.35) * lum})`);
-          somaGrad.addColorStop(0.25, `${pc.brightRGB}${(0.45 + fire * 0.25) * lum})`);
-          somaGrad.addColorStop(0.6, `${pc.softRGB}${(0.2 + fire * 0.12) * lum})`);
+          // Sharp white-hot center when firing — like a crystalline flash
+          somaGrad.addColorStop(0, `rgba(255, 253, 255, ${Math.min(0.95, (0.65 + fire * 0.4)) * lum})`);
+          somaGrad.addColorStop(0.15, `${pc.brightRGB}${(0.5 + fire * 0.3) * lum})`);
+          somaGrad.addColorStop(0.5, `${pc.softRGB}${(0.22 + fire * 0.15) * lum})`);
           somaGrad.addColorStop(1, `${pc.dimRGB}${0.06 * lum})`);
         } else {
           somaGrad.addColorStop(0, `${pc.somaRGB}${(0.35 + energy * 0.35) * lum})`);
@@ -1116,6 +1388,21 @@ export default function Renew() {
           ctx.fillStyle = bg; ctx.beginPath(); ctx.arc(bx, by, br, 0, Math.PI * 2); ctx.fill();
         }
 
+        // ── Spawn glow ring — expanding ring when neuron is brand new ──
+        if (n.maturity < 0.15) {
+          const spawnPhase = n.maturity / 0.15; // 0 to 1 over first ~20 seconds
+          const ringR = 15 + spawnPhase * 40;
+          const ringAlpha = (1 - spawnPhase) * 0.2;
+          ctx.strokeStyle = `${pc.brightRGB}${ringAlpha})`;
+          ctx.lineWidth = 1.5 * (1 - spawnPhase);
+          ctx.beginPath(); ctx.arc(n.x, n.y, ringR, 0, Math.PI * 2); ctx.stroke();
+          // Soft glow fill
+          const spawnGlow = ctx.createRadialGradient(n.x, n.y, ringR * 0.5, n.x, n.y, ringR * 1.5);
+          spawnGlow.addColorStop(0, `${pc.fogRGB}${ringAlpha * 0.3})`);
+          spawnGlow.addColorStop(1, `${pc.deepRGB}0)`);
+          ctx.fillStyle = spawnGlow; ctx.beginPath(); ctx.arc(n.x, n.y, ringR * 1.5, 0, Math.PI * 2); ctx.fill();
+        }
+
         // ── Bright nucleus — hot white center ──
         const hlR = r * 0.4;
         const hlX = n.x - r * 0.1, hlY = n.y - r * 0.1;
@@ -1137,53 +1424,56 @@ export default function Renew() {
   const sessionPillarUI = getPillarColors(selectedCategory?.name);
   const pillarAccentCSS = `rgb(${sessionPillarUI.fire[0]}, ${sessionPillarUI.fire[1]}, ${sessionPillarUI.fire[2]})`;
 
-  // ─── Shared styles ───
+  // ─── Shared styles — silk-smooth transitions ───
+  const silk = "cubic-bezier(0.22, 1, 0.36, 1)"; // smooth deceleration
   const card = {
     background: P.card,
     border: `1px solid ${P.cardBorder}`,
-    borderRadius: 12,
+    borderRadius: 14,
     padding: 18,
     fontFamily: FONT,
+    transition: `border-color 0.4s ${silk}, background 0.4s ${silk}, box-shadow 0.5s ${silk}`,
   };
 
   const btnMain = {
-    background: P.accent,
+    background: "linear-gradient(135deg, #7C6AFF 0%, #6355D8 100%)",
     color: P.white,
     border: "none",
-    borderRadius: 8,
+    borderRadius: 10,
     padding: "14px 36px",
     fontSize: 13,
     fontWeight: 600,
     cursor: "pointer",
     fontFamily: FONT,
-    letterSpacing: 0.8,
+    letterSpacing: 1,
     textTransform: "uppercase",
-    transition: "all 0.2s",
-    boxShadow: `0 0 30px ${P.accentGlow}`,
+    transition: `all 0.4s ${silk}`,
+    boxShadow: `0 0 30px ${P.accentGlow}, 0 2px 8px rgba(0,0,0,0.3)`,
   };
 
   const btnGhost = {
     background: "transparent",
     color: P.textSoft,
     border: `1px solid ${P.cardBorder}`,
-    borderRadius: 8,
+    borderRadius: 10,
     padding: "10px 22px",
     fontSize: 11,
     cursor: "pointer",
     fontFamily: FONT,
     fontWeight: 500,
-    letterSpacing: 0.5,
+    letterSpacing: 0.8,
     textTransform: "uppercase",
+    transition: `all 0.4s ${silk}`,
   };
 
   const backBtn = {
     background: "none", border: "none", color: P.textSoft, fontSize: 12,
     cursor: "pointer", fontFamily: FONT, padding: "4px 0", marginBottom: 16,
-    letterSpacing: 0.5, fontWeight: 500,
+    letterSpacing: 0.8, fontWeight: 500, transition: `color 0.35s ${silk}`,
   };
 
   const labelStyle = {
-    color: P.textDim, fontSize: 9, fontWeight: 600, letterSpacing: 1.5,
+    color: P.textDim, fontSize: 9, fontWeight: 600, letterSpacing: 2,
     textTransform: "uppercase", fontFamily: FONT, marginBottom: 4,
   };
 
@@ -1202,79 +1492,111 @@ export default function Renew() {
     <div style={{
       position: "absolute", inset: 0, zIndex: 20,
       display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-      background: "radial-gradient(ellipse at 50% 40%, rgba(124,106,255,0.04) 0%, #000 70%)",
       padding: "0 28px",
-      paddingTop: "max(28px, env(safe-area-inset-top, 28px))",
-      paddingBottom: "max(220px, calc(220px + env(safe-area-inset-bottom, 0px)))",
+      paddingTop: "max(60px, env(safe-area-inset-top, 60px))",
+      paddingBottom: "max(60px, calc(60px + env(safe-area-inset-bottom, 0px)))",
       paddingLeft: "max(28px, env(safe-area-inset-left, 28px))",
       paddingRight: "max(28px, env(safe-area-inset-right, 28px))",
       fontFamily: FONT,
     }}>
-
-      {/* Logo mark */}
+      {/* Breathing fog gradient — always present, slowly pulsing */}
       <div style={{
-        width: 48, height: 48, borderRadius: "50%",
-        background: "radial-gradient(circle, rgba(165,180,252,0.2), transparent 70%)",
+        position: "absolute", inset: 0, pointerEvents: "none",
+        background: "radial-gradient(ellipse at 50% 40%, rgba(124,106,255,0.07) 0%, rgba(79,70,229,0.025) 40%, transparent 70%)",
+        animation: "renewFogBreathe 12s ease-in-out infinite",
+      }} />
+
+      {/* Logo mark — silky entrance */}
+      <div style={{
+        width: 44, height: 44, borderRadius: "50%",
+        background: "radial-gradient(circle, rgba(165,180,252,0.18), rgba(79,70,229,0.06) 60%, transparent 80%)",
         display: "flex", alignItems: "center", justifyContent: "center",
-        marginBottom: 24,
+        marginBottom: 12,
+        animation: "renewLogoEntrance 1.4s cubic-bezier(0.22, 1, 0.36, 1) both",
+        animationDelay: "0.15s",
       }}>
         <div style={{
-          width: 10, height: 10, borderRadius: "50%",
-          background: "radial-gradient(circle, #A5B4FC, #4F46E5)",
-          boxShadow: "0 0 16px rgba(165,180,252,0.4)",
+          width: 9, height: 9, borderRadius: "50%",
+          background: "radial-gradient(circle, #A5B4FC, #6366F1)",
+          boxShadow: "0 0 20px rgba(165,180,252,0.5), 0 0 40px rgba(124,106,255,0.15)",
+          animation: "renewPulseGlow 5s ease-in-out infinite",
         }} />
       </div>
 
       <h1 style={{
-        color: P.white, fontSize: 14, fontWeight: 700, margin: 0,
-        letterSpacing: 6, textTransform: "uppercase", fontFamily: FONT,
+        color: P.white, fontSize: 15, fontWeight: 700, margin: 0,
+        letterSpacing: 8, textTransform: "uppercase", fontFamily: FONT,
+        animation: "renewFadeInUp 1s cubic-bezier(0.22, 1, 0.36, 1) both",
+        animationDelay: "0.4s",
       }}>
         RENEW
       </h1>
 
       <div style={{
-        width: 32, height: 1, background: P.cardBorder, margin: "16px 0",
-      }} />
+        height: 1, position: "relative",
+        background: `linear-gradient(90deg, transparent, ${P.cardBorder}, transparent)`,
+        margin: "10px 0",
+        animation: "renewDividerGrow 1.2s cubic-bezier(0.22, 1, 0.36, 1) both",
+        animationDelay: "0.65s",
+        overflow: "hidden",
+      }}>
+        {/* Shimmer — light catching a thin wire */}
+        <div style={{
+          position: "absolute", inset: 0,
+          background: "linear-gradient(90deg, transparent 30%, rgba(165,180,252,0.25) 50%, transparent 70%)",
+          backgroundSize: "200px 1px",
+          animation: "renewDividerShimmer 4s linear infinite",
+          animationDelay: "2s",
+        }} />
+      </div>
 
       {isFirstTime ? (
-        <>
+        <div style={{
+          animation: "renewFadeInUp 1.1s cubic-bezier(0.22, 1, 0.36, 1) both",
+          animationDelay: "0.85s", textAlign: "center",
+        }}>
           <p style={{
-            color: P.textSoft, fontSize: 13, fontWeight: 300, textAlign: "center",
-            maxWidth: 280, lineHeight: 2, margin: "0 0 8px", fontFamily: FONT,
+            color: P.textSoft, fontSize: 14, fontWeight: 300, textAlign: "center",
+            maxWidth: 280, lineHeight: 1.8, margin: "0 0 4px", fontFamily: FONT_BODY,
             opacity: 0.9,
           }}>
             speak the Word
           </p>
           <p style={{
-            color: P.textDim, fontSize: 11, fontWeight: 300, textAlign: "center",
-            maxWidth: 280, lineHeight: 1.8, margin: "0 0 32px", fontFamily: FONT,
+            color: P.textDim, fontSize: 11, fontWeight: 400, textAlign: "center",
+            maxWidth: 280, lineHeight: 1.6, margin: "0 0 16px", fontFamily: FONT_BODY,
+            letterSpacing: 0.3,
           }}>
             And watch what grows.
           </p>
-        </>
+        </div>
       ) : (
-        <>
+        <div style={{
+          animation: "renewFadeInUp 1.1s cubic-bezier(0.22, 1, 0.36, 1) both",
+          animationDelay: "0.85s", textAlign: "center",
+        }}>
           <p style={{
-            color: P.textSoft, fontSize: 12, fontWeight: 300, textAlign: "center",
-            maxWidth: 300, lineHeight: 1.8, margin: "0 0 6px", fontFamily: FONT,
+            color: P.textSoft, fontSize: 13, fontWeight: 300, textAlign: "center",
+            maxWidth: 300, lineHeight: 1.6, margin: "0 0 4px", fontFamily: FONT_BODY,
           }}>
             Your mind is being renewed.
           </p>
           <p style={{
             color: P.textDim, fontSize: 10, fontWeight: 400, textAlign: "center",
-            maxWidth: 300, lineHeight: 1.7, margin: "0 0 32px", fontFamily: FONT,
+            maxWidth: 300, lineHeight: 1.5, margin: "0 0 16px", fontFamily: FONT_BODY,
           }}>
             {lifetimeNeurons} neurons formed across {sessionHistory.length} session{sessionHistory.length !== 1 ? "s" : ""}.
           </p>
-        </>
+        </div>
       )}
 
-      {/* Streak — top right corner */}
+      {/* Streak — top right corner with flicker animation */}
       {currentStreak > 0 && (
         <div style={{
           position: "absolute", top: "max(20px, env(safe-area-inset-top, 20px))", right: "max(22px, env(safe-area-inset-right, 22px))",
           display: "flex", alignItems: "center", gap: 5,
-          cursor: "pointer", opacity: 0.7,
+          cursor: "pointer",
+          animation: "renewStreakFlicker 3s ease-in-out infinite",
         }} onClick={() => setScreen("history")}>
           <span style={{ color: P.streak, fontSize: 18, fontWeight: 800, fontFamily: FONT, lineHeight: 1 }}>
             {currentStreak}
@@ -1283,21 +1605,36 @@ export default function Renew() {
         </div>
       )}
 
-      <button onClick={() => setScreen("pick-category")} style={btnMain}>
-        {isFirstTime ? "Begin" : "Choose Scripture"}
-      </button>
-
-      {!isFirstTime && (
-        <button onClick={() => setScreen("history")} style={{
-          ...btnGhost, marginTop: 12, border: "none", color: P.accent, fontSize: 10,
+      <div style={{
+        animation: "renewFadeInUp 1.2s cubic-bezier(0.22, 1, 0.36, 1) both",
+        animationDelay: "1.15s", display: "flex", flexDirection: "column", alignItems: "center",
+      }}>
+        <button className="renew-btn-tap" onClick={() => setScreen("pick-category")} style={{
+          ...btnMain,
+          background: "linear-gradient(135deg, #7C6AFF 0%, #6355D8 100%)",
+          boxShadow: "0 0 30px rgba(124,106,255,0.2), 0 2px 8px rgba(0,0,0,0.3)",
+          animation: "renewPulseGlow 3s ease-in-out infinite",
+          borderRadius: 10,
         }}>
-          View History
+          {isFirstTime ? "Begin" : "Choose Scripture"}
         </button>
-      )}
 
-      {/* Footer verse */}
-      <div style={{ position: "absolute", bottom: "max(24px, env(safe-area-inset-bottom, 24px))", left: 20, right: 20, textAlign: "center" }}>
-        <div style={{ color: P.textGhost, fontSize: 9, fontStyle: "italic", lineHeight: 1.6, fontFamily: FONT }}>
+        {!isFirstTime && (
+          <button className="renew-btn-tap" onClick={() => setScreen("history")} style={{
+            ...btnGhost, marginTop: 14, border: "none", color: P.accent, fontSize: 10,
+            letterSpacing: 1,
+          }}>
+            View History
+          </button>
+        )}
+      </div>
+
+      {/* Footer verse — breathing opacity animation */}
+      <div style={{
+        position: "absolute", bottom: "max(24px, env(safe-area-inset-bottom, 24px))", left: 20, right: 20, textAlign: "center",
+        animation: "renewBreathe 8s cubic-bezier(0.37, 0, 0.63, 1) infinite",
+      }}>
+        <div style={{ color: P.textGhost, fontSize: 9, fontStyle: "italic", lineHeight: 1.6, fontFamily: FONT_BODY, letterSpacing: 0.3 }}>
           "This Book of the Law shall not depart from your mouth..."
         </div>
         <div style={{ color: P.textGhost, fontSize: 8, marginTop: 4, fontWeight: 700, letterSpacing: 2, fontFamily: FONT }}>
@@ -1307,79 +1644,99 @@ export default function Renew() {
     </div>
   );
 
-  const renderPickCategory = () => (
+  const renderPickCategory = () => {
+    const catColors = { PERSON: sessionPillarUI.fire, VEHICLE: getPillarColors("VEHICLE").fire, ASSIGNMENT: getPillarColors("ASSIGNMENT").fire };
+    return (
     <div style={{
       position: "absolute", inset: 0, zIndex: 20,
       display: "flex", flexDirection: "column",
-      background: P.black, padding: 24,
+      background: "rgba(0,0,0,0.88)", padding: 24,
       paddingTop: "max(24px, env(safe-area-inset-top, 24px))",
       paddingBottom: "max(24px, env(safe-area-inset-bottom, 24px))",
       paddingLeft: "max(24px, env(safe-area-inset-left, 24px))",
       paddingRight: "max(24px, env(safe-area-inset-right, 24px))",
       overflowY: "auto", fontFamily: FONT,
     }}>
-      <button onClick={() => setScreen("home")} style={backBtn}>{"\u2190  back"}</button>
+      <button className="renew-btn-tap" onClick={() => setScreen("home")} style={backBtn}><svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ verticalAlign: "middle", marginRight: 6 }}><path d="M10 3L5 8L10 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>back</button>
       <div style={labelStyle}>Choose a pillar</div>
-      <h2 style={{ color: P.white, fontSize: 18, fontWeight: 700, margin: "4px 0 20px", fontFamily: FONT, letterSpacing: 3 }}>
-        PERSON  VEHICLE  ASSIGNMENT
+      <h2 style={{ color: P.white, fontSize: 18, fontWeight: 700, margin: "4px 0 22px", fontFamily: FONT, letterSpacing: 4 }}>
+        SCRIPTURE
       </h2>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {SCRIPTURE_CATEGORIES.map((cat, i) => (
-          <button key={i} onClick={() => { setSelectedCategory(cat); setScreen("pick-passage"); }} style={{
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {SCRIPTURE_CATEGORIES.map((cat, i) => {
+          const cc = getPillarColors(cat.name).fire;
+          const accentCSS = `rgb(${cc[0]}, ${cc[1]}, ${cc[2]})`;
+          return (
+          <button className="renew-btn-tap" key={i} onClick={() => { setSelectedCategory(cat); setScreen("pick-passage"); }} style={{
             ...card, cursor: "pointer", display: "flex", alignItems: "center", gap: 14,
-            textAlign: "left", transition: "border-color 0.2s, background 0.2s",
+            textAlign: "left", position: "relative", overflow: "hidden", padding: "18px 18px 18px 22px",
+            borderLeft: `3px solid ${accentCSS}`,
+            background: `linear-gradient(135deg, rgba(${cc[0]}, ${cc[1]}, ${cc[2]}, 0.04) 0%, ${P.card} 60%)`,
+            boxShadow: `inset 0 0 40px rgba(${cc[0]}, ${cc[1]}, ${cc[2]}, 0.03)`,
+            animation: `renewStaggerIn 0.7s cubic-bezier(0.22, 1, 0.36, 1) both`,
+            animationDelay: `${i * 0.08}s`,
           }}
-          onMouseEnter={e => { e.currentTarget.style.borderColor = P.accent + "44"; e.currentTarget.style.background = P.surface; }}
-          onMouseLeave={e => { e.currentTarget.style.borderColor = P.cardBorder; e.currentTarget.style.background = P.card; }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = accentCSS; e.currentTarget.style.background = `linear-gradient(135deg, rgba(${cc[0]}, ${cc[1]}, ${cc[2]}, 0.08) 0%, ${P.surface} 60%)`; e.currentTarget.style.boxShadow = `0 0 25px rgba(${cc[0]}, ${cc[1]}, ${cc[2]}, 0.1), inset 0 0 40px rgba(${cc[0]}, ${cc[1]}, ${cc[2]}, 0.05)`; }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = P.cardBorder; e.currentTarget.style.borderLeftColor = accentCSS; e.currentTarget.style.background = `linear-gradient(135deg, rgba(${cc[0]}, ${cc[1]}, ${cc[2]}, 0.04) 0%, ${P.card} 60%)`; e.currentTarget.style.boxShadow = `inset 0 0 40px rgba(${cc[0]}, ${cc[1]}, ${cc[2]}, 0.03)`; }}
           >
-            <div>
-              <div style={{ color: P.text, fontSize: 13, fontWeight: 600, fontFamily: FONT, letterSpacing: 2 }}>{cat.name}</div>
-              <div style={{ color: P.textSoft, fontSize: 10, fontFamily: FONT, fontWeight: 300 }}>{cat.subtitle}</div>
-              <div style={{ color: P.textDim, fontSize: 9, fontFamily: FONT, marginTop: 2 }}>{cat.passages.length} passages</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ color: P.text, fontSize: 13, fontWeight: 700, fontFamily: FONT, letterSpacing: 3 }}>{cat.name}</div>
+              <div style={{ color: P.textSoft, fontSize: 10, fontFamily: FONT_BODY, fontWeight: 400, marginTop: 2 }}>{cat.subtitle}</div>
+              <div style={{ color: P.textDim, fontSize: 9, fontFamily: FONT, marginTop: 4, letterSpacing: 0.5 }}>{cat.passages.length} passages</div>
             </div>
+            <div style={{ fontSize: 22, opacity: 0.35, filter: `drop-shadow(0 0 8px rgba(${cc[0]}, ${cc[1]}, ${cc[2]}, 0.3))` }}>{cat.icon}</div>
           </button>
-        ))}
+        );
+        })}
       </div>
 
-      <button onClick={() => setScreen("custom")} style={{ ...btnGhost, marginTop: 16, alignSelf: "flex-start" }}>
+      <button className="renew-btn-tap" onClick={() => setScreen("custom")} style={{ ...btnGhost, marginTop: 18, alignSelf: "flex-start" }}>
         enter your own scripture
       </button>
     </div>
   );
+  };
 
   const renderPickPassage = () => (
-    <div style={{
+    <div className="renew-smooth-scroll renew-scroll-container" style={{
       position: "absolute", inset: 0, zIndex: 20,
       display: "flex", flexDirection: "column",
-      background: P.black, padding: 24,
+      background: "rgba(0,0,0,0.88)", padding: 24,
       paddingTop: "max(24px, env(safe-area-inset-top, 24px))",
       paddingBottom: "max(24px, env(safe-area-inset-bottom, 24px))",
       paddingLeft: "max(24px, env(safe-area-inset-left, 24px))",
       paddingRight: "max(24px, env(safe-area-inset-right, 24px))",
       overflowY: "auto", fontFamily: FONT,
     }}>
-      <button onClick={() => setScreen("pick-category")} style={backBtn}>{"\u2190  back"}</button>
+      <button className="renew-btn-tap" onClick={() => setScreen("pick-category")} style={backBtn}><svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ verticalAlign: "middle", marginRight: 6 }}><path d="M10 3L5 8L10 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>back</button>
       <div style={{ marginBottom: 4 }}>
         <div style={labelStyle}>Pillar</div>
-        <h2 style={{ color: P.white, fontSize: 16, fontWeight: 700, margin: "4px 0 0", fontFamily: FONT, letterSpacing: 2 }}>{selectedCategory?.name}</h2>
+        <h2 style={{ color: P.white, fontSize: 16, fontWeight: 700, margin: "4px 0 0", fontFamily: FONT, letterSpacing: 3 }}>{selectedCategory?.name}</h2>
       </div>
-      <div style={{ color: P.textDim, fontSize: 10, margin: "4px 0 18px", fontFamily: FONT }}>
+      <div style={{ color: P.textDim, fontSize: 10, margin: "4px 0 18px", fontFamily: FONT_BODY }}>
         Tap a passage to begin speaking it aloud
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {selectedCategory?.passages.map((p, i) => {
           const saved = passageNetworksRef.current[getPassageKey(p)];
+          const hasSaved = !!saved;
           return (
-            <button key={i} onClick={() => { setSelectedPassage(p); startListening(p); }} style={{
-              ...card, cursor: "pointer", textAlign: "left", transition: "border-color 0.2s, background 0.2s",
+            <button className="renew-btn-tap" key={i} onClick={() => { setSelectedPassage(p); startListening(p); }} style={{
+              ...card, cursor: "pointer", textAlign: "left",
+              borderLeft: `3px solid ${pillarAccentCSS}`,
+              padding: "16px 16px 16px 20px",
+              background: hasSaved ? `rgba(${sessionPillarUI.fire[0]}, ${sessionPillarUI.fire[1]}, ${sessionPillarUI.fire[2]}, 0.03)` : P.card,
+              boxShadow: hasSaved ? `inset 0 0 30px rgba(${sessionPillarUI.fire[0]}, ${sessionPillarUI.fire[1]}, ${sessionPillarUI.fire[2]}, 0.04)` : "none",
+              animation: `renewStaggerIn 0.7s cubic-bezier(0.22, 1, 0.36, 1) both`,
+              animationDelay: `${Math.min(i * 0.04, 0.6)}s`,
             }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = P.accent + "44"; e.currentTarget.style.background = P.surface; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = P.cardBorder; e.currentTarget.style.background = P.card; }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = pillarAccentCSS; e.currentTarget.style.background = P.surface; e.currentTarget.style.boxShadow = `0 0 20px rgba(${sessionPillarUI.fire[0]}, ${sessionPillarUI.fire[1]}, ${sessionPillarUI.fire[2]}, 0.08)`; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = P.cardBorder; e.currentTarget.style.borderLeftColor = pillarAccentCSS; e.currentTarget.style.background = hasSaved ? `rgba(${sessionPillarUI.fire[0]}, ${sessionPillarUI.fire[1]}, ${sessionPillarUI.fire[2]}, 0.03)` : P.card; e.currentTarget.style.boxShadow = hasSaved ? `inset 0 0 30px rgba(${sessionPillarUI.fire[0]}, ${sessionPillarUI.fire[1]}, ${sessionPillarUI.fire[2]}, 0.04)` : "none"; }}
             >
               <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 8 }}>
-                <div style={{ color: pillarAccentCSS, fontSize: 11, fontWeight: 700, fontFamily: FONT, letterSpacing: 0.5 }}>
+                <div style={{ color: pillarAccentCSS, fontSize: 11, fontWeight: 700, fontFamily: FONT, letterSpacing: 1 }}>
                   {p.ref}
                 </div>
                 {saved && (
@@ -1389,7 +1746,7 @@ export default function Renew() {
                     <div style={{
                       width: 6, height: 6, borderRadius: "50%",
                       background: pillarAccentCSS,
-                      boxShadow: `0 0 8px ${pillarAccentCSS}`,
+                      boxShadow: `0 0 10px ${pillarAccentCSS}`,
                     }} />
                     <span style={{ color: P.textDim, fontSize: 9, fontFamily: FONT }}>
                       {saved.neurons.length} neurons
@@ -1398,7 +1755,7 @@ export default function Renew() {
                 )}
               </div>
               <div style={{
-                color: P.textSoft, fontSize: 11, lineHeight: 1.7, fontFamily: FONT, fontWeight: 300,
+                color: P.textSoft, fontSize: 12, lineHeight: 1.75, fontFamily: FONT_BODY, fontWeight: 300,
                 display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden",
               }}>
                 {p.text}
@@ -1414,44 +1771,46 @@ export default function Renew() {
     <div style={{
       position: "absolute", inset: 0, zIndex: 20,
       display: "flex", flexDirection: "column",
-      background: P.black, padding: 24,
+      background: "rgba(0,0,0,0.9)", padding: 24,
       paddingTop: "max(24px, env(safe-area-inset-top, 24px))",
       paddingBottom: "max(24px, env(safe-area-inset-bottom, 24px))",
       paddingLeft: "max(24px, env(safe-area-inset-left, 24px))",
       paddingRight: "max(24px, env(safe-area-inset-right, 24px))",
       fontFamily: FONT,
     }}>
-      <button onClick={() => setScreen("home")} style={backBtn}>{"\u2190  back"}</button>
+      <button className="renew-btn-tap" onClick={() => setScreen("home")} style={backBtn}><svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ verticalAlign: "middle", marginRight: 6 }}><path d="M10 3L5 8L10 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>back</button>
       <div style={labelStyle}>Custom passage</div>
-      <h2 style={{ color: P.white, fontSize: 16, fontWeight: 700, margin: "4px 0 24px", fontFamily: FONT }}>
+      <h2 style={{ color: P.white, fontSize: 16, fontWeight: 700, margin: "4px 0 24px", fontFamily: FONT, letterSpacing: 2 }}>
         Enter your Scripture
       </h2>
 
       <div style={{ marginBottom: 16 }}>
         <div style={{ ...labelStyle, marginBottom: 8 }}>Reference</div>
-        <input value={customRef} onChange={e => setCustomRef(e.target.value)}
+        <input className="renew-input" value={customRef} onChange={e => setCustomRef(e.target.value)}
           placeholder="e.g. Psalm 91:1-2"
           style={{
             width: "100%", boxSizing: "border-box",
             background: P.surface, border: `1px solid ${P.cardBorder}`,
-            borderRadius: 8, padding: "12px 14px", color: P.text, fontSize: 12,
+            borderRadius: 10, padding: "13px 16px", color: P.text, fontSize: 13,
             fontFamily: FONT, outline: "none", fontWeight: 400,
+            transition: "border-color 0.3s, box-shadow 0.3s",
           }} />
       </div>
       <div style={{ marginBottom: 28 }}>
         <div style={{ ...labelStyle, marginBottom: 8 }}>Scripture text</div>
-        <textarea value={customText} onChange={e => setCustomText(e.target.value)}
+        <textarea className="renew-input" value={customText} onChange={e => setCustomText(e.target.value)}
           placeholder="Type or paste the Scripture here..."
           rows={6}
           style={{
             width: "100%", boxSizing: "border-box",
             background: P.surface, border: `1px solid ${P.cardBorder}`,
-            borderRadius: 8, padding: "12px 14px", color: P.text, fontSize: 12,
-            fontFamily: FONT, outline: "none", resize: "vertical", lineHeight: 1.8, fontWeight: 300,
+            borderRadius: 10, padding: "13px 16px", color: P.text, fontSize: 13,
+            fontFamily: FONT_BODY, outline: "none", resize: "vertical", lineHeight: 1.85, fontWeight: 300,
+            transition: "border-color 0.3s, box-shadow 0.3s",
           }} />
       </div>
 
-      <button
+      <button className="renew-btn-tap"
         onClick={() => { const p = { ref: customRef || "Custom", text: customText }; setSelectedPassage(p); startListening(p); }}
         disabled={!customText.trim()}
         style={{ ...btnMain, alignSelf: "center", opacity: customText.trim() ? 1 : 0.3, cursor: customText.trim() ? "pointer" : "not-allowed" }}
@@ -1459,7 +1818,7 @@ export default function Renew() {
         Begin Speaking
       </button>
       {permissionDenied && (
-        <p style={{ color: P.danger, fontSize: 10, marginTop: 12, textAlign: "center", fontFamily: FONT }}>
+        <p style={{ color: P.danger, fontSize: 10, marginTop: 12, textAlign: "center", fontFamily: FONT_BODY }}>
           Microphone access required. Please allow and try again.
         </p>
       )}
@@ -1476,13 +1835,13 @@ export default function Renew() {
         paddingLeft: "max(18px, env(safe-area-inset-left, 18px))",
         paddingRight: "max(18px, env(safe-area-inset-right, 18px))",
         display: "flex", justifyContent: "space-between", alignItems: "flex-start",
-        zIndex: 10, background: "linear-gradient(180deg, rgba(0,0,0,0.9) 0%, transparent 100%)", fontFamily: FONT,
+        zIndex: 10, background: "linear-gradient(180deg, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.4) 70%, transparent 100%)", fontFamily: FONT,
       }}>
         <div>
-          <div style={{ color: P.white, fontSize: 10, fontWeight: 700, letterSpacing: 4, textTransform: "uppercase" }}>
+          <div style={{ color: P.white, fontSize: 10, fontWeight: 700, letterSpacing: 5, textTransform: "uppercase" }}>
             RENEW
           </div>
-          <div style={{ color: P.textDim, fontSize: 8, marginTop: 2, letterSpacing: 1, fontWeight: 500 }}>
+          <div style={{ color: P.textDim, fontSize: 8, marginTop: 3, letterSpacing: 1.2, fontWeight: 500, fontFamily: FONT_BODY }}>
             speak the Word &middot; renew your mind
           </div>
         </div>
@@ -1493,28 +1852,34 @@ export default function Renew() {
             { val: fmtTime(totalTime), label: "Speaking", color: P.accent },
           ].map((s, i) => (
             <div key={i} style={{ textAlign: "right" }}>
-              <div style={{ color: s.color, fontSize: 15, fontWeight: 700, fontFamily: FONT }}>{s.val}</div>
+              <div style={{ color: s.color, fontSize: 15, fontWeight: 700, fontFamily: FONT, textShadow: `0 0 12px ${s.color}44`, animation: "renewBreathe 6s ease-in-out infinite", animationDelay: `${i * 0.5}s` }}>{s.val}</div>
               <div style={{ ...statLabel, fontSize: 7 }}>{s.label}</div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Scripture card */}
+      {/* Scripture card — glassmorphism */}
       {selectedPassage && (
         <div style={{ position: "absolute", top: "calc(56px + env(safe-area-inset-top, 0px))", left: 14, right: 14, zIndex: 10 }}>
           <div style={{
-            ...card, padding: "14px 16px",
-            background: isSpeaking ? "rgba(10,10,10,0.85)" : "rgba(10,10,10,0.5)",
-            borderColor: isSpeaking ? P.accent + "33" : P.cardBorder,
+            ...card, padding: "14px 18px",
+            background: isSpeaking
+              ? `linear-gradient(135deg, rgba(${sessionPillarUI.fire[0]}, ${sessionPillarUI.fire[1]}, ${sessionPillarUI.fire[2]}, 0.06) 0%, rgba(10,10,10,0.75) 40%)`
+              : "linear-gradient(135deg, rgba(20,18,15,0.5) 0%, rgba(10,10,10,0.45) 100%)",
+            backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)",
+            borderColor: isSpeaking ? `rgba(${sessionPillarUI.fire[0]}, ${sessionPillarUI.fire[1]}, ${sessionPillarUI.fire[2]}, 0.2)` : "rgba(255,245,230,0.06)",
             transition: "all 0.5s", maxHeight: 130, overflowY: "auto",
+            boxShadow: isSpeaking
+              ? `0 0 30px rgba(${sessionPillarUI.fire[0]}, ${sessionPillarUI.fire[1]}, ${sessionPillarUI.fire[2]}, 0.08), inset 0 1px 0 rgba(255,245,230,0.04)`
+              : "inset 0 1px 0 rgba(255,245,230,0.03)",
           }}>
-            <div style={{ color: pillarAccentCSS, fontSize: 9, fontWeight: 700, marginBottom: 8, letterSpacing: 1.5, textTransform: "uppercase", fontFamily: FONT }}>
+            <div style={{ color: pillarAccentCSS, fontSize: 9, fontWeight: 700, marginBottom: 8, letterSpacing: 2, textTransform: "uppercase", fontFamily: FONT }}>
               {selectedPassage.ref}
             </div>
             <div style={{
               color: isSpeaking ? P.text : P.textSoft,
-              fontSize: 11, lineHeight: 1.9, fontWeight: 300, fontFamily: FONT,
+              fontSize: 12, lineHeight: 1.9, fontWeight: 300, fontFamily: FONT_BODY,
               transition: "color 0.5s",
             }}>
               {selectedPassage.text}
@@ -1526,20 +1891,20 @@ export default function Renew() {
       {/* Bottom controls — Joshua 1:8 + waveform + status + end */}
       <div style={{
         position: "absolute", bottom: 0, left: 0, right: 0,
-        display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
+        display: "flex", flexDirection: "column", alignItems: "center", gap: 5,
         zIndex: 10, fontFamily: FONT,
         paddingBottom: "max(40px, calc(40px + env(safe-area-inset-bottom, 0px)))",
         paddingLeft: "env(safe-area-inset-left, 0px)",
         paddingRight: "env(safe-area-inset-right, 0px)",
         paddingTop: 14,
-        background: "linear-gradient(0deg, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.6) 60%, transparent 100%)",
+        background: "linear-gradient(0deg, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.6) 60%, transparent 100%)",
       }}>
-        {/* Joshua 1:8 — compact */}
-        <div style={{ textAlign: "center", padding: "0 20px", marginBottom: 2 }}>
+        {/* Joshua 1:8 — compact with breathing */}
+        <div style={{ textAlign: "center", padding: "0 20px", marginBottom: 3 }}>
           <div style={{
             color: isSpeaking ? P.textDim : P.textGhost,
             fontSize: 8, fontStyle: "italic", lineHeight: 1.5, transition: "color 0.5s",
-            fontWeight: 300, fontFamily: FONT,
+            fontWeight: 300, fontFamily: FONT_BODY,
           }}>
             "This Book of the Law shall not depart from your mouth..."
           </div>
@@ -1552,78 +1917,122 @@ export default function Renew() {
           </div>
         </div>
 
-        {/* Live waveform visualizer */}
-        <div style={{
-          display: "flex", alignItems: "center", gap: 2.5, height: 28,
-          padding: "0 12px",
-        }}>
-          {Array.from({length: 16}, (_, i) => {
-            const center = 7.5;
-            const dist = Math.abs(i - center) / center;
-            const wave = 1 - dist * 0.7;
-            const phase = Date.now() * 0.004 + i * 0.6;
-            const ripple = Math.sin(phase) * 0.3 + 0.7;
-            const h = isSpeaking
-              ? 4 + volume * 55 * wave * ripple
-              : 2 + Math.sin(Date.now() * 0.002 + i * 0.4) * 1;
-            return (
-              <div key={i} style={{
-                width: 2.5, borderRadius: 2,
-                background: isSpeaking
-                  ? `rgba(${sessionPillarUI.fire[0]}, ${sessionPillarUI.fire[1]}, ${sessionPillarUI.fire[2]}, ${0.5 + volume * 0.5})`
-                  : P.textDim,
-                height: `${h}px`,
-                transition: "height 0.08s ease-out, background 0.3s",
-                opacity: isSpeaking ? 0.6 + volume * 0.4 : 0.2,
-                boxShadow: isSpeaking && volume > 0.1
-                  ? `0 0 ${4 + volume * 8}px rgba(${sessionPillarUI.fire[0]}, ${sessionPillarUI.fire[1]}, ${sessionPillarUI.fire[2]}, ${volume * 0.3})`
-                  : "none",
-              }} />
-            );
-          })}
+        {/* Live waveform visualizer — organic with reflection */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0 }}>
+          <div style={{
+            display: "flex", alignItems: "flex-end", gap: 2, height: 32,
+            padding: "0 12px",
+          }}>
+            {Array.from({length: 20}, (_, i) => {
+              const center = 9.5;
+              const dist = Math.abs(i - center) / center;
+              const wave = 1 - dist * 0.65;
+              const phase = Date.now() * 0.004 + i * 0.5;
+              const ripple = Math.sin(phase) * 0.3 + 0.7;
+              const h = isSpeaking
+                ? 4 + volume * 60 * wave * ripple
+                : 2 + Math.sin(Date.now() * 0.002 + i * 0.4) * 1.2;
+              const barWidth = 1.8 + Math.sin(i * 0.7) * 0.6;
+              return (
+                <div key={i} style={{
+                  width: barWidth, borderRadius: "3px 3px 1px 1px",
+                  background: isSpeaking
+                    ? `rgba(${sessionPillarUI.fire[0]}, ${sessionPillarUI.fire[1]}, ${sessionPillarUI.fire[2]}, ${0.5 + volume * 0.5})`
+                    : P.textDim,
+                  height: `${h}px`,
+                  transition: "height 0.06s ease-out, background 0.3s",
+                  opacity: isSpeaking ? 0.65 + volume * 0.35 : 0.2,
+                  boxShadow: isSpeaking && volume > 0.08
+                    ? `0 0 ${5 + volume * 10}px rgba(${sessionPillarUI.fire[0]}, ${sessionPillarUI.fire[1]}, ${sessionPillarUI.fire[2]}, ${volume * 0.35})`
+                    : "none",
+                }} />
+              );
+            })}
+          </div>
+          {/* Reflection — faint mirror below */}
+          <div style={{
+            display: "flex", alignItems: "flex-start", gap: 2, height: 10,
+            padding: "0 12px", opacity: isSpeaking ? 0.15 : 0.05,
+            transform: "scaleY(-1)", filter: "blur(1px)",
+            maskImage: "linear-gradient(to bottom, rgba(0,0,0,0.4), transparent)",
+            WebkitMaskImage: "linear-gradient(to bottom, rgba(0,0,0,0.4), transparent)",
+            transition: "opacity 0.3s",
+          }}>
+            {Array.from({length: 20}, (_, i) => {
+              const center = 9.5;
+              const dist = Math.abs(i - center) / center;
+              const wave = 1 - dist * 0.65;
+              const phase = Date.now() * 0.004 + i * 0.5;
+              const ripple = Math.sin(phase) * 0.3 + 0.7;
+              const h = isSpeaking
+                ? Math.min(10, (4 + volume * 60 * wave * ripple) * 0.3)
+                : Math.min(10, (2 + Math.sin(Date.now() * 0.002 + i * 0.4) * 1.2) * 0.3);
+              const barWidth = 1.8 + Math.sin(i * 0.7) * 0.6;
+              return (
+                <div key={i} style={{
+                  width: barWidth, borderRadius: 1,
+                  background: isSpeaking
+                    ? `rgba(${sessionPillarUI.fire[0]}, ${sessionPillarUI.fire[1]}, ${sessionPillarUI.fire[2]}, 0.5)`
+                    : P.textDim,
+                  height: `${h}px`,
+                  transition: "height 0.06s ease-out",
+                }} />
+              );
+            })}
+          </div>
         </div>
 
         <span style={{
-          fontSize: 9, color: isSpeaking ? P.fire : P.textDim,
-          fontWeight: 500, letterSpacing: 1.5, fontFamily: FONT,
+          fontSize: 9, color: isSpeaking ? pillarAccentCSS : P.textDim,
+          fontWeight: 600, letterSpacing: 2, fontFamily: FONT,
           textTransform: "uppercase", transition: "color 0.3s",
+          animation: isSpeaking ? "renewStatusPulse 2s ease-in-out infinite" : "none",
         }}>
           {isSpeaking ? "speaking" : "listening"}
         </span>
 
         {/* End button — large touch target for mobile */}
-        <button onClick={endSession} style={{
+        <button className="renew-btn-tap" onClick={endSession} style={{
           ...btnGhost,
-          marginTop: 2,
+          marginTop: 4,
           padding: "12px 40px",
           fontSize: 11,
           letterSpacing: 2,
-          borderColor: P.textGhost,
+          borderColor: "rgba(255,255,255,0.08)",
           color: P.textSoft,
           borderRadius: 24,
           minHeight: 44,
           WebkitTapHighlightColor: "transparent",
+          backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)",
         }}>END</button>
       </div>
 
-      {isSpeaking && (
-        <div style={{
-          position: "absolute", inset: 0, pointerEvents: "none", zIndex: 5,
-          boxShadow: `inset 0 0 ${50 + volume * 80}px rgba(${sessionPillarUI.fire[0]}, ${sessionPillarUI.fire[1]}, ${sessionPillarUI.fire[2]}, ${volume * 0.1})`,
-          transition: "box-shadow 0.2s",
-        }} />
-      )}
+      {/* Vignette — pulses with voice when speaking, dims to quiet anticipation when listening */}
+      <div style={{
+        position: "absolute", inset: 0, pointerEvents: "none", zIndex: 5,
+        boxShadow: isSpeaking
+          ? `inset 0 0 ${60 + volume * 100}px rgba(${sessionPillarUI.fire[0]}, ${sessionPillarUI.fire[1]}, ${sessionPillarUI.fire[2]}, ${0.02 + volume * 0.12})`
+          : "inset 0 0 120px rgba(0,0,0,0.4)",
+        transition: isSpeaking ? "box-shadow 0.15s ease-out" : "box-shadow 1.5s ease-in-out",
+        opacity: isSpeaking ? 1 : 0.8,
+      }} />
     </>
   );
 
   const renderSummary = () => {
     const last = sessionHistory[sessionHistory.length - 1];
     const grew = lastGrowthRef.current || { neurons: 0, synapses: 0, dendrites: 0, speakTime: 0 };
+    const growthItems = [
+      grew.neurons > 0 && { label: "New neurons formed", value: `+${grew.neurons}`, color: P.neuronCore },
+      grew.dendrites > 0 && { label: "Neurites sprouted", value: `+${grew.dendrites}`, color: P.fire },
+      grew.synapses > 0 && { label: "Connections formed", value: `+${grew.synapses}`, color: P.accent },
+    ].filter(Boolean);
+
     return (
       <div style={{
         position: "absolute", inset: 0, zIndex: 20,
         display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-        background: "radial-gradient(ellipse at 50% 40%, rgba(192,132,252,0.04) 0%, #000 70%)",
+        background: "radial-gradient(ellipse at 50% 40%, rgba(192,132,252,0.06) 0%, rgba(79,70,229,0.02) 40%, #000 70%)",
         padding: 28,
         paddingTop: "max(28px, env(safe-area-inset-top, 28px))",
         paddingBottom: "max(28px, env(safe-area-inset-bottom, 28px))",
@@ -1631,44 +2040,71 @@ export default function Renew() {
         paddingRight: "max(28px, env(safe-area-inset-right, 28px))",
         fontFamily: FONT,
       }}>
-        <div style={labelStyle}>Session complete</div>
-        <h2 style={{ color: P.white, fontSize: 20, fontWeight: 300, margin: "6px 0 4px", letterSpacing: 1, fontFamily: FONT }}>
-          Well done.
-        </h2>
-        <div style={{ color: pillarAccentCSS, fontSize: 11, fontWeight: 600, letterSpacing: 0.5, fontFamily: FONT, marginBottom: 24 }}>
-          {last?.ref}
+        {/* Radial light burst behind "Well done" */}
+        <div style={{
+          position: "absolute", top: "30%", left: "50%", transform: "translate(-50%, -50%)",
+          width: 300, height: 300, borderRadius: "50%",
+          background: `radial-gradient(circle, rgba(${sessionPillarUI.fire[0]}, ${sessionPillarUI.fire[1]}, ${sessionPillarUI.fire[2]}, 0.08) 0%, transparent 70%)`,
+          animation: "renewRadialBurst 2s cubic-bezier(0.22, 1, 0.36, 1) both",
+          animationDelay: "0.3s",
+          pointerEvents: "none",
+        }} />
+        {/* Expanding concentric rings */}
+        {[0, 1, 2].map(ri => (
+          <div key={ri} style={{
+            position: "absolute", top: "30%", left: "50%", transform: "translate(-50%, -50%)",
+            width: 200, height: 200, borderRadius: "50%",
+            border: `1px solid rgba(${sessionPillarUI.fire[0]}, ${sessionPillarUI.fire[1]}, ${sessionPillarUI.fire[2]}, 0.08)`,
+            animation: "renewRingExpand 3s ease-out both",
+            animationDelay: `${0.5 + ri * 0.6}s`,
+            pointerEvents: "none",
+          }} />
+        ))}
+
+        <div style={{
+          animation: "renewFadeInUp 0.9s cubic-bezier(0.22, 1, 0.36, 1) both",
+          animationDelay: "0.1s", textAlign: "center", position: "relative",
+        }}>
+          <div style={labelStyle}>Session complete</div>
+          <h2 style={{ color: P.white, fontSize: 22, fontWeight: 300, margin: "6px 0 4px", letterSpacing: 1.5, fontFamily: FONT_BODY }}>
+            Well done.
+          </h2>
+          <div style={{ color: pillarAccentCSS, fontSize: 11, fontWeight: 600, letterSpacing: 1, fontFamily: FONT, marginBottom: 24 }}>
+            {last?.ref}
+          </div>
         </div>
 
         {/* Time spoken this session */}
-        <div style={{ color: P.white, fontSize: 28, fontWeight: 200, fontFamily: FONT, letterSpacing: 2, marginBottom: 4 }}>
-          {fmtTime(grew.speakTime)}
+        <div style={{
+          animation: "renewCountUp 1s cubic-bezier(0.22, 1, 0.36, 1) both",
+          animationDelay: "0.3s", textAlign: "center",
+        }}>
+          <div style={{ color: P.white, fontSize: 30, fontWeight: 200, fontFamily: FONT, letterSpacing: 3, marginBottom: 4 }}>
+            {fmtTime(grew.speakTime)}
+          </div>
+          <div style={{ ...labelStyle, marginBottom: 24, color: P.textDim }}>spoken this session</div>
         </div>
-        <div style={{ ...labelStyle, marginBottom: 24, color: P.textDim }}>spoken this session</div>
 
-        {/* Growth this session — what sprouted */}
-        <div style={{ ...card, padding: "16px 20px", marginBottom: 20, width: "100%", maxWidth: 300 }}>
+        {/* Growth this session — staggered reveal */}
+        <div style={{
+          ...card, padding: "16px 20px", marginBottom: 20, width: "100%", maxWidth: 300,
+          animation: "renewFadeInUp 0.9s cubic-bezier(0.22, 1, 0.36, 1) both",
+          animationDelay: "0.5s",
+        }}>
           <div style={{ ...labelStyle, marginBottom: 12 }}>This session</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {grew.neurons > 0 && (
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ color: P.textSoft, fontSize: 11, fontFamily: FONT }}>New neurons formed</span>
-                <span style={{ color: P.neuronCore, fontSize: 14, fontWeight: 700, fontFamily: FONT }}>+{grew.neurons}</span>
+            {growthItems.map((item, idx) => (
+              <div key={idx} style={{
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                animation: "renewAchievementFlash 0.8s cubic-bezier(0.22, 1, 0.36, 1) both",
+                animationDelay: `${0.7 + idx * 0.18}s`,
+              }}>
+                <span style={{ color: P.textSoft, fontSize: 11, fontFamily: FONT_BODY }}>{item.label}</span>
+                <span style={{ color: item.color, fontSize: 14, fontWeight: 700, fontFamily: FONT, textShadow: `0 0 8px ${item.color}33` }}>{item.value}</span>
               </div>
-            )}
-            {grew.dendrites > 0 && (
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ color: P.textSoft, fontSize: 11, fontFamily: FONT }}>Neurites sprouted</span>
-                <span style={{ color: P.fire, fontSize: 14, fontWeight: 700, fontFamily: FONT }}>+{grew.dendrites}</span>
-              </div>
-            )}
-            {grew.synapses > 0 && (
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ color: P.textSoft, fontSize: 11, fontFamily: FONT }}>Connections formed</span>
-                <span style={{ color: P.accent, fontSize: 14, fontWeight: 700, fontFamily: FONT }}>+{grew.synapses}</span>
-              </div>
-            )}
-            {grew.neurons === 0 && grew.dendrites === 0 && grew.synapses === 0 && (
-              <div style={{ color: P.textDim, fontSize: 11, fontFamily: FONT, textAlign: "center" }}>
+            ))}
+            {growthItems.length === 0 && (
+              <div style={{ color: P.textDim, fontSize: 11, fontFamily: FONT_BODY, textAlign: "center" }}>
                 Your network strengthened. Growth takes time.
               </div>
             )}
@@ -1676,10 +2112,15 @@ export default function Renew() {
         </div>
 
         {/* Lifetime network */}
-        <div style={{ ...card, padding: "12px 20px", marginBottom: 24, width: "100%", maxWidth: 300, borderColor: "rgba(251,146,60,0.15)", background: P.surface }}>
+        <div style={{
+          ...card, padding: "12px 20px", marginBottom: 24, width: "100%", maxWidth: 300,
+          borderColor: "rgba(251,146,60,0.15)", background: P.surface,
+          animation: "renewFadeInUp 0.9s cubic-bezier(0.22, 1, 0.36, 1) both",
+          animationDelay: "0.8s",
+        }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div>
-              <div style={{ color: P.streak, fontSize: 14, fontWeight: 700, fontFamily: FONT }}>{currentStreak} day streak</div>
+              <div style={{ color: P.streak, fontSize: 14, fontWeight: 700, fontFamily: FONT, animation: "renewStreakFlicker 3s ease-in-out infinite" }}>{currentStreak} day streak</div>
               <div style={{ color: P.textDim, fontSize: 9, fontFamily: FONT }}>best: {longestStreak} days</div>
             </div>
             <div style={{ textAlign: "right" }}>
@@ -1689,67 +2130,92 @@ export default function Renew() {
           </div>
         </div>
 
-        <button onClick={() => { setSelectedPassage(null); setScreen(selectedCategory ? "pick-passage" : "home"); }} style={btnMain}>
-          Continue
-        </button>
-        <button onClick={() => { setSelectedPassage(null); setScreen("home"); }} style={{ ...btnGhost, marginTop: 12 }}>
-          Home
-        </button>
+        <div style={{
+          animation: "renewFadeInUp 0.9s cubic-bezier(0.22, 1, 0.36, 1) both",
+          animationDelay: "1s", display: "flex", flexDirection: "column", alignItems: "center",
+        }}>
+          <button className="renew-btn-tap" onClick={() => { setSelectedPassage(null); setScreen(selectedCategory ? "pick-passage" : "home"); }} style={{
+            ...btnMain,
+            background: "linear-gradient(135deg, #8B7AFF 0%, #7C6AFF 40%, #9B8AFF 100%)",
+            boxShadow: "0 0 35px rgba(155,138,255,0.25), 0 2px 12px rgba(0,0,0,0.3)",
+          }}>
+            Continue
+          </button>
+          <button className="renew-btn-tap" onClick={() => { setSelectedPassage(null); setScreen("home"); }} style={{ ...btnGhost, marginTop: 12 }}>
+            Home
+          </button>
+        </div>
       </div>
     );
   };
 
   const renderHistory = () => (
-    <div style={{
+    <div className="renew-smooth-scroll renew-scroll-container" style={{
       position: "absolute", inset: 0, zIndex: 20,
       display: "flex", flexDirection: "column",
-      background: P.black, padding: 24,
+      background: "rgba(0,0,0,0.85)",
+      backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)",
+      padding: 24,
       paddingTop: "max(24px, env(safe-area-inset-top, 24px))",
       paddingBottom: "max(24px, env(safe-area-inset-bottom, 24px))",
       paddingLeft: "max(24px, env(safe-area-inset-left, 24px))",
       paddingRight: "max(24px, env(safe-area-inset-right, 24px))",
       overflowY: "auto", fontFamily: FONT,
     }}>
-      <button onClick={() => setScreen("home")} style={backBtn}>{"\u2190  back"}</button>
+      <button className="renew-btn-tap" onClick={() => setScreen("home")} style={backBtn}><svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ verticalAlign: "middle", marginRight: 6 }}><path d="M10 3L5 8L10 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>back</button>
       <div style={labelStyle}>Your journey</div>
-      <h2 style={{ color: P.white, fontSize: 18, fontWeight: 700, margin: "4px 0 20px", fontFamily: FONT }}>
+      <h2 style={{ color: P.white, fontSize: 18, fontWeight: 700, margin: "4px 0 22px", fontFamily: FONT, letterSpacing: 3 }}>
         History & Stats
       </h2>
 
-      <div style={{ display: "flex", gap: 6, marginBottom: 24 }}>
+      <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
         {[
           { label: "Total time", value: fmtShort(lifetimeSeconds), color: P.accent },
           { label: "Streak", value: `${currentStreak}d`, color: P.streak },
           { label: "Best", value: `${longestStreak}d`, color: P.fire },
           { label: "Neurons", value: lifetimeNeurons, color: P.neuronCore },
         ].map((s, i) => (
-          <div key={i} style={{ ...card, padding: "12px 6px", flex: 1, textAlign: "center" }}>
-            <div style={{ ...statNum(s.color), fontSize: 16 }}>{s.value}</div>
+          <div key={i} style={{
+            ...card, padding: "12px 6px", flex: 1, textAlign: "center",
+            background: `linear-gradient(180deg, rgba(${s.color === P.accent ? '124,106,255' : s.color === P.streak ? '251,146,60' : s.color === P.fire ? '192,132,252' : '165,180,252'}, 0.04) 0%, ${P.card} 100%)`,
+            animation: `renewStaggerIn 0.7s cubic-bezier(0.22, 1, 0.36, 1) both`,
+            animationDelay: `${i * 0.08}s`,
+          }}>
+            <div style={{ ...statNum(s.color), fontSize: 16, textShadow: `0 0 10px ${s.color}33` }}>{s.value}</div>
             <div style={{ ...statLabel, fontSize: 7 }}>{s.label}</div>
           </div>
         ))}
       </div>
 
       <div style={{ ...labelStyle, marginBottom: 10 }}>Past sessions</div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        {[...sessionHistory].reverse().map((s, i) => (
+      <div style={{ display: "flex", flexDirection: "column", gap: 0, position: "relative" }}>
+        {/* Timeline vertical line */}
+        {sessionHistory.length > 0 && (
+          <div style={{
+            position: "absolute", left: 18, top: 10, bottom: 10, width: 1,
+            background: `linear-gradient(180deg, ${P.cardBorder}, rgba(124,106,255,0.12), ${P.cardBorder})`,
+          }} />
+        )}
+        {[...sessionHistory].reverse().map((s, i) => {
+          // Find pillar color from passage reference
+          const pillarCat = SCRIPTURE_CATEGORIES.find(c => c.passages.some(p => p.ref === s.ref));
+          const pc = pillarCat ? getPillarColors(pillarCat.name).fire : [124, 106, 255];
+          const refColor = `rgb(${pc[0]}, ${pc[1]}, ${pc[2]})`;
+          return (
           <div key={i} style={{
-            ...card, padding: "12px 14px",
+            ...card, padding: "12px 14px 12px 42px",
             display: "flex", alignItems: "center", gap: 12,
+            marginBottom: 6, position: "relative", borderLeft: "none",
           }}>
+            {/* Timeline node */}
             <div style={{
-              width: 36, height: 36, borderRadius: 8,
-              background: P.surface, display: "flex", alignItems: "center", justifyContent: "center",
-              border: `1px solid ${P.cardBorder}`,
-            }}>
-              <div style={{
-                width: 8, height: 8, borderRadius: "50%",
-                background: `radial-gradient(circle, ${P.neuronCore}, ${P.synapse})`,
-                boxShadow: `0 0 8px ${P.accentGlow}`,
-              }} />
-            </div>
+              position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)",
+              width: 12, height: 12, borderRadius: "50%", zIndex: 2,
+              background: `radial-gradient(circle, ${refColor}, rgba(${pc[0]}, ${pc[1]}, ${pc[2]}, 0.3))`,
+              boxShadow: `0 0 8px rgba(${pc[0]}, ${pc[1]}, ${pc[2]}, 0.3)`,
+            }} />
             <div style={{ flex: 1 }}>
-              <div style={{ color: P.text, fontSize: 12, fontWeight: 600, fontFamily: FONT }}>{s.ref}</div>
+              <div style={{ color: refColor, fontSize: 12, fontWeight: 600, fontFamily: FONT }}>{s.ref}</div>
               <div style={{ color: P.textDim, fontSize: 9, fontFamily: FONT }}>
                 {new Date(s.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
               </div>
@@ -1759,31 +2225,73 @@ export default function Renew() {
               <div style={{ color: P.textDim, fontSize: 9, fontFamily: FONT }}>{s.neurons} neurons</div>
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
       {sessionHistory.length === 0 && (
-        <div style={{ color: P.textDim, fontSize: 11, textAlign: "center", marginTop: 40, fontFamily: FONT }}>
-          No sessions yet. Start speaking the Word.
+        <div style={{ textAlign: "center", marginTop: 50, padding: "0 20px" }}>
+          {/* Poetic empty state with faint neural sketch */}
+          <div style={{
+            width: 48, height: 48, borderRadius: "50%", margin: "0 auto 16px",
+            background: "radial-gradient(circle, rgba(165,180,252,0.08), transparent 70%)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
+            <div style={{
+              width: 6, height: 6, borderRadius: "50%",
+              background: "radial-gradient(circle, rgba(165,180,252,0.3), rgba(99,85,216,0.1))",
+              boxShadow: "0 0 12px rgba(165,180,252,0.15)",
+            }} />
+          </div>
+          <div style={{ color: P.textDim, fontSize: 12, fontFamily: FONT_BODY, fontWeight: 300, lineHeight: 1.8 }}>
+            Your story begins with a single verse.
+          </div>
+          <div style={{ color: P.textGhost, fontSize: 10, fontFamily: FONT_BODY, fontWeight: 300, marginTop: 6 }}>
+            Speak it aloud and watch something grow.
+          </div>
         </div>
       )}
     </div>
   );
 
+  // Screen content wrapper with transition animation
+  const screenContent = (() => {
+    switch (screen) {
+      case "home": return renderHome();
+      case "pick-category": return renderPickCategory();
+      case "pick-passage": return renderPickPassage();
+      case "custom": return renderCustom();
+      case "session": return renderSession();
+      case "summary": return renderSummary();
+      case "history": return renderHistory();
+      default: return null;
+    }
+  })();
+
   return (
-    <div style={{
+    <div className="renew-noise" style={{
       background: P.black, width: "100%", height: "100%",
       position: "relative", overflow: "hidden", fontFamily: FONT,
     }}>
       <div style={{ position: "absolute", inset: 0 }}>
         <canvas ref={canvasRef} style={{ display: "block", width: "100%", height: "100%" }} />
       </div>
-      {screen === "home" && renderHome()}
-      {screen === "pick-category" && renderPickCategory()}
-      {screen === "pick-passage" && renderPickPassage()}
-      {screen === "custom" && renderCustom()}
-      {screen === "session" && renderSession()}
-      {screen === "summary" && renderSummary()}
-      {screen === "history" && renderHistory()}
+      <div key={screen} className={screen !== "session" ? "renew-screen-enter" : ""} style={{ position: "absolute", inset: 0, zIndex: 10 }}>
+        {screenContent}
+      </div>
+      {/* Loading state — logo dot materializing then dissolving */}
+      {!appLoaded && (
+        <div style={{
+          position: "absolute", inset: 0, zIndex: 100,
+          background: "#000", display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          <div style={{
+            width: 9, height: 9, borderRadius: "50%",
+            background: "radial-gradient(circle, #A5B4FC, #6366F1)",
+            boxShadow: "0 0 30px rgba(165,180,252,0.5), 0 0 60px rgba(124,106,255,0.2)",
+            animation: "renewLogoEntrance 0.8s cubic-bezier(0.22, 1, 0.36, 1) both",
+          }} />
+        </div>
+      )}
     </div>
   );
 }
