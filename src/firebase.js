@@ -1,17 +1,17 @@
 // ─── Firebase Configuration ───
-// Replace the values below with your Firebase project credentials
-// Get these from: Firebase Console → Project Settings → Your apps → Web app
+// Values are injected at build time from environment variables
+// Set these in GitHub repo Settings → Secrets → Actions
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyC_glsVu3boO7sKHB-_xFl_pR7Jhz5YY6k",
-  authDomain: "renew-41486.firebaseapp.com",
-  projectId: "renew-41486",
-  storageBucket: "renew-41486.firebasestorage.app",
-  messagingSenderId: "990899796803",
-  appId: "1:990899796803:web:ace605e659933933d88df6",
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
 const app = initializeApp(firebaseConfig);
