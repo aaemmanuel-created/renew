@@ -1,44 +1,20 @@
-const CACHE_NAME = 'renew-v1';
+// Self-destruct service worker — clears all caches and unregisters itself
+// This replaces the old caching SW that was serving stale builds
 
-// Install — cache the app shell
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll([
-        '/renew/',
-        '/renew/index.html',
-      ]);
-    })
-  );
+self.addEventListener('install', () => {
   self.skipWaiting();
 });
 
-// Activate — clean old caches
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
-      return Promise.all(
-        keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
-      );
+      return Promise.all(keys.map((key) => caches.delete(key)));
+    }).then(() => {
+      return self.registration.unregister();
+    }).then(() => {
+      return self.clients.matchAll();
+    }).then((clients) => {
+      clients.forEach((client) => client.navigate(client.url));
     })
-  );
-  self.clients.claim();
-});
-
-// Fetch — network first, fall back to cache
-self.addEventListener('fetch', (event) => {
-  event.respondWith(
-    fetch(event.request)
-      .then((response) => {
-        // Cache successful responses
-        if (response.ok) {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-        }
-        return response;
-      })
-      .catch(() => {
-        return caches.match(event.request);
-      })
   );
 });
