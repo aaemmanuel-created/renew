@@ -677,8 +677,11 @@ class Synapse {
 function createInitialState(w, h, pillar) {
   const n = new Neuron(w / 2, h / 2, 0, pillar);
   n.energy = 0.85; n.maturity = 1; n.radius = 8;
-  // Start as a bare cell — no dendrites yet. They grow as you speak.
+  // Start with a few short dendrites so the neuron looks alive from the start
   n.dendrites = [];
+  for (let i = 0; i < 3; i++) growDendrite(n);
+  // Give the starter dendrites partial extension so they're visible immediately
+  n.dendrites.forEach(d => { d.length = d.targetLength * (0.3 + Math.random() * 0.3); });
   return { neurons: [n], synapses: [], nextId: 1, totalSpeakTime: 0, sessionFires: 0 };
 }
 
@@ -749,7 +752,9 @@ function addNeuron(state, w, h, pillar) {
     Math.max(35, Math.min(w - 35, parent.x + Math.cos(ang) * d)),
     Math.max(75, Math.min(h - 95, parent.y + Math.sin(ang) * d)), id, pillar
   );
-  neuron.dendrites = []; // Start bare — dendrites grow organically as you speak
+  // Start with 2 short dendrites so new neurons look alive immediately
+  neuron.dendrites = [];
+  for (let i = 0; i < 2; i++) growDendrite(neuron);
   state.neurons.push(neuron);
   const sId = state.nextId++;
   state.synapses.push(new Synapse(parent.id, neuron.id, sId));
@@ -1356,8 +1361,8 @@ export default function Renew() {
         const newTime = Math.floor(st.totalSpeakTime);
         if (newTime !== totalTime) setTotalTime(newTime);
 
-        // Fire neurons — every 3-5 seconds, like a slow heartbeat
-        if (now - lastFireRef.current > Math.max(3000, 5000 - vol * 2000)) {
+        // Fire neurons — every 1.5-3 seconds, responsive heartbeat
+        if (now - lastFireRef.current > Math.max(1500, 3000 - vol * 1500)) {
           lastFireRef.current = now;
           fireNeuron(st, st.neurons[Math.floor(Math.random() * st.neurons.length)], synapseMap);
           // Sound: crystalline fire tone
@@ -1368,15 +1373,15 @@ export default function Renew() {
           }
         }
 
-        // Grow dendrites on neurons — a new neurite sprouts every ~8-15s of speaking
+        // Grow dendrites on neurons — a new neurite sprouts every ~4-8s of speaking
         for (const neuron of st.neurons) {
-          if (Math.random() < 0.001 + vol * 0.0008) { // ~once every 8-15s at normal volume
+          if (Math.random() < 0.003 + vol * 0.002) { // ~once every 4-8s at normal volume
             growDendrite(neuron);
           }
         }
 
-        // Spawn new neuron — requires 60-120+ seconds of accumulated speaking
-        const si = 60 + Math.min(st.neurons.length * 5, 60);
+        // Spawn new neuron — requires 25-50+ seconds of accumulated speaking
+        const si = 25 + Math.min(st.neurons.length * 5, 25);
         if (speakAccRef.current > si && st.neurons.length < 50) {
           speakAccRef.current = 0; addNeuron(st, w, h, sessionPillar);
           setNeuronCount(st.neurons.length); setSynapseCount(st.synapses.length);
@@ -1387,8 +1392,8 @@ export default function Renew() {
             try { toneRef.current.spawnSynth.triggerAttackRelease(note, "2n"); } catch {}
           }
 
-          // Rarely form extra connections (15% chance)
-          if (Math.random() < 0.15) {
+          // Form extra connections (30% chance) for richer network
+          if (Math.random() < 0.30) {
             const a = st.neurons[Math.floor(Math.random() * st.neurons.length)];
             for (const b of st.neurons) {
               if (a.id !== b.id && dst(a, b) < 120 && !st.synapses.some(s => (s.from === a.id && s.to === b.id) || (s.from === b.id && s.to === a.id))) {
@@ -1429,7 +1434,7 @@ export default function Renew() {
         // Animate dendrite growth — slowly extend toward targetLength with unfurling curve
         for (const d of n.dendrites) {
           if (d.targetLength && d.length < d.targetLength) {
-            d.length = Math.min(d.targetLength, d.length + 0.15); // slow organic extension
+            d.length = Math.min(d.targetLength, d.length + 0.4); // visible organic extension
             // Unfurling: curves deepen as dendrite extends, like a plant growing toward light
             const growthPct = d.length / d.targetLength;
             if (growthPct < 0.8) {
