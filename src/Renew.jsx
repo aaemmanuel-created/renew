@@ -1211,18 +1211,37 @@ export default function Renew() {
       fontFamily: FONT,
     }}>
 
-      {/* Logo mark */}
-      <div style={{
-        width: 36, height: 36, borderRadius: "50%",
-        background: "radial-gradient(circle, rgba(165,180,252,0.2), transparent 70%)",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        marginBottom: 10,
-      }}>
-        <div style={{
-          width: 8, height: 8, borderRadius: "50%",
-          background: "radial-gradient(circle, #A5B4FC, #4F46E5)",
-          boxShadow: "0 0 16px rgba(165,180,252,0.4)",
-        }} />
+      {/* Logo mark — radial neural network */}
+      <div style={{ marginBottom: 14, filter: "drop-shadow(0 0 12px rgba(165,180,252,0.3))" }}>
+        <svg width="56" height="56" viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <line x1="28" y1="28" x2="28" y2="10" stroke="#4F46E5" strokeWidth="0.8" opacity="0.5"/>
+          <line x1="28" y1="28" x2="42" y2="16" stroke="#4F46E5" strokeWidth="0.8" opacity="0.4"/>
+          <line x1="28" y1="28" x2="44" y2="28" stroke="#4F46E5" strokeWidth="0.8" opacity="0.5"/>
+          <line x1="28" y1="28" x2="42" y2="40" stroke="#4F46E5" strokeWidth="0.8" opacity="0.4"/>
+          <line x1="28" y1="28" x2="28" y2="46" stroke="#4F46E5" strokeWidth="0.8" opacity="0.5"/>
+          <line x1="28" y1="28" x2="14" y2="40" stroke="#4F46E5" strokeWidth="0.8" opacity="0.4"/>
+          <line x1="28" y1="28" x2="12" y2="28" stroke="#4F46E5" strokeWidth="0.8" opacity="0.5"/>
+          <line x1="28" y1="28" x2="14" y2="16" stroke="#4F46E5" strokeWidth="0.8" opacity="0.4"/>
+          <line x1="28" y1="10" x2="42" y2="16" stroke="#4F46E5" strokeWidth="0.5" opacity="0.2"/>
+          <line x1="42" y1="16" x2="44" y2="28" stroke="#4F46E5" strokeWidth="0.5" opacity="0.2"/>
+          <line x1="44" y1="28" x2="42" y2="40" stroke="#4F46E5" strokeWidth="0.5" opacity="0.2"/>
+          <line x1="42" y1="40" x2="28" y2="46" stroke="#4F46E5" strokeWidth="0.5" opacity="0.2"/>
+          <line x1="28" y1="46" x2="14" y2="40" stroke="#4F46E5" strokeWidth="0.5" opacity="0.2"/>
+          <line x1="14" y1="40" x2="12" y2="28" stroke="#4F46E5" strokeWidth="0.5" opacity="0.2"/>
+          <line x1="12" y1="28" x2="14" y2="16" stroke="#4F46E5" strokeWidth="0.5" opacity="0.2"/>
+          <line x1="14" y1="16" x2="28" y2="10" stroke="#4F46E5" strokeWidth="0.5" opacity="0.2"/>
+          <circle cx="28" cy="28" r="5" fill="url(#logoGrad)"/>
+          <circle cx="28" cy="28" r="8" fill="rgba(165,180,252,0.1)"/>
+          <circle cx="28" cy="10" r="3" fill="url(#logoGrad)"/>
+          <circle cx="42" cy="16" r="2.5" fill="url(#logoGrad)"/>
+          <circle cx="44" cy="28" r="2.5" fill="url(#logoGrad)"/>
+          <circle cx="42" cy="40" r="2.5" fill="url(#logoGrad)"/>
+          <circle cx="28" cy="46" r="3" fill="url(#logoGrad)"/>
+          <circle cx="14" cy="40" r="2.5" fill="url(#logoGrad)"/>
+          <circle cx="12" cy="28" r="2.5" fill="url(#logoGrad)"/>
+          <circle cx="14" cy="16" r="2.5" fill="url(#logoGrad)"/>
+          <defs><radialGradient id="logoGrad"><stop stopColor="#A5B4FC"/><stop offset="1" stopColor="#4F46E5"/></radialGradient></defs>
+        </svg>
       </div>
 
       <h1 style={{
