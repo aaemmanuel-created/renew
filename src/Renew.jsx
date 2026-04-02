@@ -1036,14 +1036,17 @@ export default function Renew() {
   useEffect(() => {
     const c = canvasRef.current; if (!c) return;
     const resize = () => {
-      c.width = c.parentElement.clientWidth;
-      c.height = c.parentElement.clientHeight;
-      if (!stateRef.current) stateRef.current = createInitialState(c.width, c.height);
+      const dpr = window.devicePixelRatio || 1;
+      const logicalW = c.parentElement.clientWidth;
+      const logicalH = c.parentElement.clientHeight;
+      c.width = logicalW * dpr;
+      c.height = logicalH * dpr;
+      if (!stateRef.current) stateRef.current = createInitialState(logicalW, logicalH);
       // Initialize ambient particle system
       if (!particlesRef.current) {
         particlesRef.current = Array.from({length: 40}, () => ({
-          x: Math.random() * c.width,
-          y: Math.random() * c.height,
+          x: Math.random() * logicalW,
+          y: Math.random() * logicalH,
           vx: (Math.random() - 0.5) * 0.15,
           vy: (Math.random() - 0.5) * 0.15,
           size: 0.5 + Math.random() * 1.5,
@@ -1060,10 +1063,12 @@ export default function Renew() {
   useEffect(() => {
     const c = canvasRef.current;
     if (!c) return;
+    const dpr = window.devicePixelRatio || 1;
+    const logW = c.width / dpr, logH = c.height / dpr;
     if (screen === "home") {
       // Home screen: show faint ambient network if passages have been spoken
       // Always keep particles visible — even for first-time users the void feels alive
-      const combined = buildCombinedState(c.width, c.height);
+      const combined = buildCombinedState(logW, logH);
       if (combined.neurons.length > 1) {
         // Dim the network for ambient background effect
         combined.neurons.forEach(n => { n.energy = Math.max(0.08, n.energy * 0.3); n.fireLevel = 0; });
@@ -1073,7 +1078,7 @@ export default function Renew() {
         stateRef.current = { neurons: [], synapses: [], nextId: 0, totalSpeakTime: 0, sessionFires: 0 };
       }
     } else if (screen === "summary" || screen === "history" || screen === "pick-category" || screen === "pick-passage" || screen === "custom") {
-      const combined = buildCombinedState(c.width, c.height);
+      const combined = buildCombinedState(logW, logH);
       if (combined.neurons.length > 0) {
         // Dim neurons slightly for background ambient effect
         if (screen !== "summary") {
@@ -1147,7 +1152,8 @@ export default function Renew() {
     // Load existing network for this passage, or create new
     const c = canvasRef.current;
     if (c) {
-      stateRef.current = loadOrCreateNetwork(p, c.width, c.height, selectedCategory?.name);
+      const dpr = window.devicePixelRatio || 1;
+      stateRef.current = loadOrCreateNetwork(p, c.width / dpr, c.height / dpr, selectedCategory?.name);
       setNeuronCount(stateRef.current.neurons.length);
       setSynapseCount(stateRef.current.synapses.length);
       setTotalTime(Math.floor(stateRef.current.totalSpeakTime || 0));
@@ -1286,7 +1292,10 @@ export default function Renew() {
     const ctx = c.getContext("2d"); let run = true;
     const loop = () => {
       if (!run) return;
-      const w = c.width, h = c.height, st = stateRef.current;
+      const dpr = window.devicePixelRatio || 1;
+      const w = c.width / dpr, h = c.height / dpr, st = stateRef.current;
+      // Scale canvas context for retina sharpness
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       if (!st) { animRef.current = requestAnimationFrame(loop); return; }
       const now = Date.now();
 
