@@ -899,7 +899,7 @@ export default function Renew() {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const a = ctx.createAnalyser(); a.fftSize = 256; a.smoothingTimeConstant = 0.8;
+      const a = ctx.createAnalyser(); a.fftSize = 512; a.smoothingTimeConstant = 0.4;
       ctx.createMediaStreamSource(stream).connect(a);
       audioCtxRef.current = ctx; analyserRef.current = a;
       setIsListening(true);
@@ -1035,11 +1035,24 @@ export default function Renew() {
       if (analyserRef.current) {
         const d = new Uint8Array(analyserRef.current.frequencyBinCount);
         analyserRef.current.getByteFrequencyData(d);
-        vol = d.reduce((a, b) => a + b, 0) / d.length / 255;
+        // Focus on speech frequencies (~85-800Hz) — bins 2-40 of 256 bins at 48kHz
+        // This ignores high-frequency noise and low rumble, giving a cleaner voice signal
+        const speechStart = 2, speechEnd = Math.min(50, d.length);
+        let sum = 0, peak = 0;
+        for (let i = speechStart; i < speechEnd; i++) {
+          sum += d[i];
+          if (d[i] > peak) peak = d[i];
+        }
+        const avg = sum / (speechEnd - speechStart) / 255;
+        const peakNorm = peak / 255;
+        // Blend average and peak for responsive yet stable signal
+        vol = avg * 0.4 + peakNorm * 0.6;
+        // Apply gentle curve to make quiet speech more visible
+        vol = Math.pow(vol, 0.7);
       }
-      const spk = vol > 0.06;
-      // Throttle React state updates — only update when values actually change
-      if (Math.abs(vol - volume) > 0.015) setVolume(vol);
+      const spk = vol > 0.08;
+      // Update volume every frame for responsive waveform — minimal throttle
+      if (Math.abs(vol - volume) > 0.005) setVolume(vol);
       if (spk !== isSpeaking) setIsSpeaking(spk);
 
       // Modulate drone volume based on voice
@@ -1735,12 +1748,11 @@ export default function Renew() {
           onMouseEnter={e => { e.currentTarget.style.borderColor = accentCSS; e.currentTarget.style.background = `linear-gradient(135deg, rgba(${cc[0]}, ${cc[1]}, ${cc[2]}, 0.08) 0%, ${P.surface} 60%)`; e.currentTarget.style.boxShadow = `0 0 25px rgba(${cc[0]}, ${cc[1]}, ${cc[2]}, 0.1), inset 0 0 40px rgba(${cc[0]}, ${cc[1]}, ${cc[2]}, 0.05)`; }}
           onMouseLeave={e => { e.currentTarget.style.borderColor = P.cardBorder; e.currentTarget.style.borderLeftColor = accentCSS; e.currentTarget.style.background = `linear-gradient(135deg, rgba(${cc[0]}, ${cc[1]}, ${cc[2]}, 0.04) 0%, ${P.card} 60%)`; e.currentTarget.style.boxShadow = `inset 0 0 40px rgba(${cc[0]}, ${cc[1]}, ${cc[2]}, 0.03)`; }}
           >
-            <div style={{ flex: 1 }}>
+            <div>
               <div style={{ color: P.text, fontSize: 13, fontWeight: 700, fontFamily: FONT, letterSpacing: 3 }}>{cat.name}</div>
               <div style={{ color: P.textSoft, fontSize: 10, fontFamily: FONT_BODY, fontWeight: 400, marginTop: 2 }}>{cat.subtitle}</div>
               <div style={{ color: P.textDim, fontSize: 9, fontFamily: FONT, marginTop: 4, letterSpacing: 0.5 }}>{cat.passages.length} passages</div>
             </div>
-            <div style={{ fontSize: 22, opacity: 0.35, filter: `drop-shadow(0 0 8px rgba(${cc[0]}, ${cc[1]}, ${cc[2]}, 0.3))` }}>{cat.icon}</div>
           </button>
         );
         })}
@@ -1972,33 +1984,34 @@ export default function Renew() {
           </div>
         </div>
 
-        {/* Live waveform visualizer — organic with reflection */}
+        {/* Live waveform visualizer — responsive to voice */}
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0 }}>
           <div style={{
-            display: "flex", alignItems: "flex-end", gap: 2, height: 32,
+            display: "flex", alignItems: "flex-end", gap: 2, height: 44,
             padding: "0 12px",
           }}>
-            {Array.from({length: 20}, (_, i) => {
-              const center = 9.5;
+            {Array.from({length: 24}, (_, i) => {
+              const center = 11.5;
               const dist = Math.abs(i - center) / center;
-              const wave = 1 - dist * 0.65;
-              const phase = Date.now() * 0.004 + i * 0.5;
-              const ripple = Math.sin(phase) * 0.3 + 0.7;
+              const wave = 1 - dist * 0.55; // less falloff at edges
+              const phase = Date.now() * 0.005 + i * 0.6;
+              const ripple = Math.sin(phase) * 0.25 + 0.75;
+              // Much higher multiplier + minimum height so quiet speech is still visible
               const h = isSpeaking
-                ? 4 + volume * 60 * wave * ripple
-                : 2 + Math.sin(Date.now() * 0.002 + i * 0.4) * 1.2;
-              const barWidth = 1.8 + Math.sin(i * 0.7) * 0.6;
+                ? Math.max(4, 3 + volume * 90 * wave * ripple)
+                : 1.5 + Math.sin(Date.now() * 0.0015 + i * 0.4) * 1;
+              const barWidth = 2 + Math.sin(i * 0.7) * 0.5;
               return (
                 <div key={i} style={{
                   width: barWidth, borderRadius: "3px 3px 1px 1px",
                   background: isSpeaking
-                    ? `rgba(${sessionPillarUI.fire[0]}, ${sessionPillarUI.fire[1]}, ${sessionPillarUI.fire[2]}, ${0.5 + volume * 0.5})`
-                    : P.textDim,
+                    ? `rgba(${sessionPillarUI.fire[0]}, ${sessionPillarUI.fire[1]}, ${sessionPillarUI.fire[2]}, ${0.55 + volume * 0.45})`
+                    : `rgba(68,68,68,0.4)`,
                   height: `${h}px`,
-                  transition: "height 0.06s ease-out, background 0.3s",
-                  opacity: isSpeaking ? 0.65 + volume * 0.35 : 0.2,
-                  boxShadow: isSpeaking && volume > 0.08
-                    ? `0 0 ${5 + volume * 10}px rgba(${sessionPillarUI.fire[0]}, ${sessionPillarUI.fire[1]}, ${sessionPillarUI.fire[2]}, ${volume * 0.35})`
+                  transition: isSpeaking ? "height 0.04s linear, background 0.15s" : "height 0.3s ease-out, background 0.5s",
+                  opacity: isSpeaking ? 0.7 + volume * 0.3 : 0.15,
+                  boxShadow: isSpeaking && volume > 0.12
+                    ? `0 0 ${4 + volume * 12}px rgba(${sessionPillarUI.fire[0]}, ${sessionPillarUI.fire[1]}, ${sessionPillarUI.fire[2]}, ${volume * 0.4})`
                     : "none",
                 }} />
               );
@@ -2006,23 +2019,23 @@ export default function Renew() {
           </div>
           {/* Reflection — faint mirror below */}
           <div style={{
-            display: "flex", alignItems: "flex-start", gap: 2, height: 10,
-            padding: "0 12px", opacity: isSpeaking ? 0.15 : 0.05,
+            display: "flex", alignItems: "flex-start", gap: 2, height: 12,
+            padding: "0 12px", opacity: isSpeaking ? 0.18 : 0.04,
             transform: "scaleY(-1)", filter: "blur(1px)",
-            maskImage: "linear-gradient(to bottom, rgba(0,0,0,0.4), transparent)",
-            WebkitMaskImage: "linear-gradient(to bottom, rgba(0,0,0,0.4), transparent)",
+            maskImage: "linear-gradient(to bottom, rgba(0,0,0,0.35), transparent)",
+            WebkitMaskImage: "linear-gradient(to bottom, rgba(0,0,0,0.35), transparent)",
             transition: "opacity 0.3s",
           }}>
-            {Array.from({length: 20}, (_, i) => {
-              const center = 9.5;
+            {Array.from({length: 24}, (_, i) => {
+              const center = 11.5;
               const dist = Math.abs(i - center) / center;
-              const wave = 1 - dist * 0.65;
-              const phase = Date.now() * 0.004 + i * 0.5;
-              const ripple = Math.sin(phase) * 0.3 + 0.7;
+              const wave = 1 - dist * 0.55;
+              const phase = Date.now() * 0.005 + i * 0.6;
+              const ripple = Math.sin(phase) * 0.25 + 0.75;
               const h = isSpeaking
-                ? Math.min(10, (4 + volume * 60 * wave * ripple) * 0.3)
-                : Math.min(10, (2 + Math.sin(Date.now() * 0.002 + i * 0.4) * 1.2) * 0.3);
-              const barWidth = 1.8 + Math.sin(i * 0.7) * 0.6;
+                ? Math.min(12, (3 + volume * 90 * wave * ripple) * 0.25)
+                : Math.min(12, 1);
+              const barWidth = 2 + Math.sin(i * 0.7) * 0.5;
               return (
                 <div key={i} style={{
                   width: barWidth, borderRadius: 1,
@@ -2030,7 +2043,7 @@ export default function Renew() {
                     ? `rgba(${sessionPillarUI.fire[0]}, ${sessionPillarUI.fire[1]}, ${sessionPillarUI.fire[2]}, 0.5)`
                     : P.textDim,
                   height: `${h}px`,
-                  transition: "height 0.06s ease-out",
+                  transition: isSpeaking ? "height 0.04s linear" : "height 0.3s ease-out",
                 }} />
               );
             })}
