@@ -29,8 +29,12 @@ if (!document.getElementById(STYLE_ID)) {
     @keyframes renewFadeInUp {
       0% {
         opacity: 0;
-        transform: translateY(22px) scale(0.98);
-        filter: blur(6px);
+        transform: translateY(18px) scale(0.97);
+        filter: blur(12px);
+      }
+      40% {
+        opacity: 0.6;
+        filter: blur(4px);
       }
       100% {
         opacity: 1;
@@ -39,7 +43,8 @@ if (!document.getElementById(STYLE_ID)) {
       }
     }
     @keyframes renewFadeIn {
-      0% { opacity: 0; filter: blur(4px); }
+      0% { opacity: 0; filter: blur(10px); }
+      50% { opacity: 0.7; filter: blur(3px); }
       100% { opacity: 1; filter: blur(0px); }
     }
     @keyframes renewBreathe {
@@ -57,8 +62,12 @@ if (!document.getElementById(STYLE_ID)) {
     @keyframes renewStaggerIn {
       0% {
         opacity: 0;
-        transform: translateY(14px) scale(0.98);
-        filter: blur(4px);
+        transform: translateY(14px) scale(0.97);
+        filter: blur(10px);
+      }
+      50% {
+        opacity: 0.7;
+        filter: blur(2px);
       }
       100% {
         opacity: 1;
@@ -79,13 +88,13 @@ if (!document.getElementById(STYLE_ID)) {
     @keyframes renewLogoEntrance {
       0% {
         opacity: 0;
-        transform: scale(0.6) translateY(12px);
-        filter: blur(10px);
+        transform: scale(0.5) translateY(14px);
+        filter: blur(16px);
       }
-      60% {
-        opacity: 0.8;
-        transform: scale(1.03) translateY(-1px);
-        filter: blur(1px);
+      50% {
+        opacity: 0.7;
+        transform: scale(1.02) translateY(-1px);
+        filter: blur(3px);
       }
       100% {
         opacity: 1;
@@ -101,7 +110,11 @@ if (!document.getElementById(STYLE_ID)) {
       0% {
         opacity: 0;
         transform: translateY(12px) scale(0.95);
-        filter: blur(6px);
+        filter: blur(12px);
+      }
+      45% {
+        opacity: 0.6;
+        filter: blur(3px);
       }
       100% {
         opacity: 1;
@@ -113,8 +126,12 @@ if (!document.getElementById(STYLE_ID)) {
     @keyframes renewScreenEnter {
       0% {
         opacity: 0;
-        transform: translateY(12px);
-        filter: blur(8px);
+        transform: translateY(10px);
+        filter: blur(14px);
+      }
+      45% {
+        opacity: 0.65;
+        filter: blur(4px);
       }
       100% {
         opacity: 1;
