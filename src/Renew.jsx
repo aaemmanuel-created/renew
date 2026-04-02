@@ -2613,6 +2613,7 @@ export default function Renew() {
           background: "#000", width: "100%", height: "100vh",
           display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
           position: "relative", overflow: "hidden", fontFamily: FONT,
+          paddingBottom: "env(safe-area-inset-bottom, 0px)",
           animation: splashExiting ? "renewSplashExit 0.7s cubic-bezier(0.22,1,0.36,1) forwards" : "none",
         }}>
           {/* Breathing fog — same as home */}
@@ -2621,9 +2622,13 @@ export default function Renew() {
             animation: "renewFogBreathe 12s ease-in-out infinite",
           }} />
 
+          {/* Spacer to push content up from true center — accounts for footer on iPhone */}
+          <div style={{ flex: "0 0 0" }} />
+
           {/* Logo orb — matches home screen size */}
           <div style={{
             width: 44, height: 44, borderRadius: "50%",
+            marginTop: "-10vh",
             background: "radial-gradient(circle, rgba(165,180,252,0.18), rgba(79,70,229,0.06) 60%, transparent 80%)",
             display: "flex", alignItems: "center", justifyContent: "center",
             marginBottom: 14,
