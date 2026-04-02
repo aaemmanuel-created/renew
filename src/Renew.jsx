@@ -1213,13 +1213,13 @@ export default function Renew() {
 
       {/* Logo mark */}
       <div style={{
-        width: 48, height: 48, borderRadius: "50%",
+        width: 36, height: 36, borderRadius: "50%",
         background: "radial-gradient(circle, rgba(165,180,252,0.2), transparent 70%)",
         display: "flex", alignItems: "center", justifyContent: "center",
-        marginBottom: 24,
+        marginBottom: 14,
       }}>
         <div style={{
-          width: 10, height: 10, borderRadius: "50%",
+          width: 8, height: 8, borderRadius: "50%",
           background: "radial-gradient(circle, #A5B4FC, #4F46E5)",
           boxShadow: "0 0 16px rgba(165,180,252,0.4)",
         }} />
@@ -1233,21 +1233,21 @@ export default function Renew() {
       </h1>
 
       <div style={{
-        width: 32, height: 1, background: P.cardBorder, margin: "16px 0",
+        width: 32, height: 1, background: P.cardBorder, margin: "10px 0",
       }} />
 
       {isFirstTime ? (
         <>
           <p style={{
             color: P.textSoft, fontSize: 13, fontWeight: 300, textAlign: "center",
-            maxWidth: 280, lineHeight: 2, margin: "0 0 8px", fontFamily: FONT,
+            maxWidth: 280, lineHeight: 1.8, margin: "0 0 4px", fontFamily: FONT,
             opacity: 0.9,
           }}>
             speak the Word
           </p>
           <p style={{
             color: P.textDim, fontSize: 11, fontWeight: 300, textAlign: "center",
-            maxWidth: 280, lineHeight: 1.8, margin: "0 0 32px", fontFamily: FONT,
+            maxWidth: 280, lineHeight: 1.6, margin: "0 0 20px", fontFamily: FONT,
           }}>
             And watch what grows.
           </p>
@@ -1256,13 +1256,13 @@ export default function Renew() {
         <>
           <p style={{
             color: P.textSoft, fontSize: 12, fontWeight: 300, textAlign: "center",
-            maxWidth: 300, lineHeight: 1.8, margin: "0 0 6px", fontFamily: FONT,
+            maxWidth: 300, lineHeight: 1.6, margin: "0 0 4px", fontFamily: FONT,
           }}>
             Your mind is being renewed.
           </p>
           <p style={{
             color: P.textDim, fontSize: 10, fontWeight: 400, textAlign: "center",
-            maxWidth: 300, lineHeight: 1.7, margin: "0 0 32px", fontFamily: FONT,
+            maxWidth: 300, lineHeight: 1.5, margin: "0 0 20px", fontFamily: FONT,
           }}>
             {lifetimeNeurons} neurons formed across {sessionHistory.length} session{sessionHistory.length !== 1 ? "s" : ""}.
           </p>
