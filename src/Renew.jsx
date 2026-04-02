@@ -1,8 +1,37 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, Component } from "react";
 import * as Tone from "tone";
 import { auth, googleProvider, db } from "./firebase";
 import { onAuthStateChanged, signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
+
+// ─── Bug 10 fix: Error Boundary ───
+class RenewErrorBoundary extends Component {
+  constructor(props) { super(props); this.state = { hasError: false }; }
+  static getDerivedStateFromError() { return { hasError: true }; }
+  componentDidCatch(error, info) { console.error("RENEW error:", error, info); }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{
+          background: "#000", color: "#E8E8E8", width: "100%", height: "100vh",
+          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+          fontFamily: "'JetBrains Mono', monospace", textAlign: "center", padding: 32,
+        }}>
+          <div style={{ fontSize: 13, letterSpacing: 6, fontWeight: 700, marginBottom: 16 }}>RENEW</div>
+          <div style={{ fontSize: 12, color: "#888", marginBottom: 24, lineHeight: 1.6 }}>
+            Something went wrong.
+          </div>
+          <button onClick={() => window.location.reload()} style={{
+            background: "linear-gradient(135deg, #7C6AFF 0%, #6355D8 100%)",
+            color: "#fff", border: "none", borderRadius: 10, padding: "12px 32px",
+            fontSize: 12, fontWeight: 600, cursor: "pointer", letterSpacing: 2,
+          }}>RELOAD</button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 // ─── Neural Network Simulation ───
 // Joshua 1:8 — "This Book of the Law shall not depart from your mouth..."
@@ -789,7 +818,7 @@ function fmtTime(s) { const m = Math.floor(s / 60); const sec = s % 60; return m
 function fmtShort(s) { if (s < 60) return `${s}s`; if (s < 3600) return `${Math.floor(s / 60)}m`; return `${(s / 3600).toFixed(1)}h`; }
 
 // ─── Component ───
-export default function Renew() {
+function RenewInner() {
   const canvasRef = useRef(null);
   const stateRef = useRef(null);
   const animRef = useRef(null);
@@ -803,6 +832,8 @@ export default function Renew() {
   const lastGrowthRef = useRef(null);
   const touchStartRef = useRef({ x: 0, y: 0, time: 0 });
   const swipeOverlayRef = useRef(null);
+  const volumeRef = useRef(0);          // Bug 4 fix: avoid stale closures in render loop
+  const isSpeakingRef = useRef(false);   // Bug 4 fix: avoid stale closures in render loop
 
   const [appLoaded, setAppLoaded] = useState(false);
   const [screen, setScreen] = useState("home");
@@ -961,7 +992,17 @@ export default function Renew() {
   const saveCurrentNetwork = useCallback(() => {
     if (!stateRef.current || !selectedPassage) return;
     const key = getPassageKey(selectedPassage);
-    passageNetworksRef.current[key] = JSON.parse(JSON.stringify(stateRef.current));
+    // Bug 7 fix: sanitize physics values before serialization to prevent NaN/Infinity
+    const state = stateRef.current;
+    state.neurons.forEach(n => {
+      n.x = isFinite(n.x) ? n.x : 0;
+      n.y = isFinite(n.y) ? n.y : 0;
+      n.vx = isFinite(n.vx) ? n.vx : 0;
+      n.vy = isFinite(n.vy) ? n.vy : 0;
+      n.energy = isFinite(n.energy) ? Math.max(0, Math.min(1, n.energy)) : 0.15;
+      n.fireLevel = isFinite(n.fireLevel) ? n.fireLevel : 0;
+    });
+    passageNetworksRef.current[key] = JSON.parse(JSON.stringify(state));
   }, [selectedPassage]);
 
   // Helper: load or create state for a passage
@@ -1178,6 +1219,7 @@ export default function Renew() {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      await ctx.resume(); // Bug 8 fix: required on iOS Safari — context starts suspended
       const a = ctx.createAnalyser(); a.fftSize = 512; a.smoothingTimeConstant = 0.4;
       ctx.createMediaStreamSource(stream).connect(a);
       audioCtxRef.current = ctx; analyserRef.current = a;
@@ -1333,9 +1375,15 @@ export default function Renew() {
         vol = Math.pow(vol, 0.7);
       }
       const spk = vol > 0.08;
-      // Update volume every frame for responsive waveform — minimal throttle
-      if (Math.abs(vol - volume) > 0.005) setVolume(vol);
-      if (spk !== isSpeaking) setIsSpeaking(spk);
+      // Bug 4+9 fix: use refs to avoid stale closures, lower threshold for smoother waveform
+      if (Math.abs(vol - volumeRef.current) > 0.001) {
+        volumeRef.current = vol;
+        setVolume(vol);
+      }
+      if (spk !== isSpeakingRef.current) {
+        isSpeakingRef.current = spk;
+        setIsSpeaking(spk);
+      }
 
       // Modulate drone volume based on voice
       if (toneRef.current && toneRef.current.drone) {
@@ -2937,5 +2985,14 @@ export default function Renew() {
         </div>
       )}
     </div>
+  );
+}
+
+// Wrap with error boundary for Bug 10
+export default function Renew() {
+  return (
+    <RenewErrorBoundary>
+      <RenewInner />
+    </RenewErrorBoundary>
   );
 }
