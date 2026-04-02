@@ -139,6 +139,85 @@ if (!document.getElementById(STYLE_ID)) {
         filter: blur(0px);
       }
     }
+    /* v2: Divider shimmer — light catching a wire */
+    @keyframes renewDividerShimmer {
+      0% { background-position: -100px 0; }
+      100% { background-position: 100px 0; }
+    }
+    /* v2: Achievement flash — stat glow on reveal */
+    @keyframes renewAchievementFlash {
+      0% {
+        opacity: 0;
+        transform: translateY(10px) scale(0.95);
+        filter: blur(8px);
+        text-shadow: none;
+      }
+      50% {
+        opacity: 1;
+        text-shadow: 0 0 18px currentColor;
+        filter: blur(0px);
+      }
+      100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        filter: blur(0px);
+        text-shadow: 0 0 6px currentColor;
+      }
+    }
+    /* v2: Radial burst behind summary */
+    @keyframes renewRadialBurst {
+      0% {
+        opacity: 0;
+        transform: scale(0.5);
+      }
+      40% {
+        opacity: 0.12;
+      }
+      100% {
+        opacity: 0.06;
+        transform: scale(1);
+      }
+    }
+    /* v2: Concentric rings expanding */
+    @keyframes renewRingExpand {
+      0% { transform: scale(0.3); opacity: 0.2; }
+      100% { transform: scale(1.2); opacity: 0; }
+    }
+    /* v2: Breathing fog on home */
+    @keyframes renewFogBreathe {
+      0%, 100% { opacity: 0.6; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.05); }
+    }
+    /* v2: Scroll edge fades */
+    .renew-scroll-container {
+      position: relative;
+      scroll-behavior: smooth;
+      -webkit-overflow-scrolling: touch;
+    }
+    .renew-scroll-container::before,
+    .renew-scroll-container::after {
+      content: '';
+      position: sticky;
+      display: block;
+      left: 0;
+      right: 0;
+      height: 32px;
+      pointer-events: none;
+      z-index: 5;
+    }
+    .renew-scroll-container::before {
+      top: 0;
+      background: linear-gradient(to bottom, rgba(0,0,0,0.9), transparent);
+    }
+    .renew-scroll-container::after {
+      bottom: 0;
+      background: linear-gradient(to top, rgba(0,0,0,0.9), transparent);
+    }
+    /* v2: Input focus glow */
+    .renew-input:focus {
+      border-color: rgba(124, 106, 255, 0.4) !important;
+      box-shadow: 0 0 16px rgba(124, 106, 255, 0.1), inset 0 0 8px rgba(124, 106, 255, 0.03) !important;
+    }
     /* Noise texture overlay */
     .renew-noise::before {
       content: '';
@@ -571,7 +650,10 @@ export default function Renew() {
   const toneRef = useRef(null);
   const sessionStartRef = useRef({ neurons: 0, synapses: 0, dendrites: 0, speakTime: 0 });
   const lastGrowthRef = useRef(null);
+  const touchStartRef = useRef({ x: 0, y: 0, time: 0 });
+  const swipeOverlayRef = useRef(null);
 
+  const [appLoaded, setAppLoaded] = useState(false);
   const [screen, setScreen] = useState("home");
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [selectedPassage, setSelectedPassage] = useState(null);
@@ -674,6 +756,12 @@ export default function Renew() {
     return combined;
   }, []);
 
+  // Loading state — brief elegant reveal
+  useEffect(() => {
+    const timer = setTimeout(() => setAppLoaded(true), 600);
+    return () => clearTimeout(timer);
+  }, []);
+
   const speakAccRef = useRef(0);
   const lastFireRef = useRef(0);
 
@@ -706,15 +794,15 @@ export default function Renew() {
     if (!c) return;
     if (screen === "home") {
       // Home screen: show faint ambient network if passages have been spoken
+      // Always keep particles visible — even for first-time users the void feels alive
       const combined = buildCombinedState(c.width, c.height);
       if (combined.neurons.length > 1) {
         // Dim the network for ambient background effect
         combined.neurons.forEach(n => { n.energy = Math.max(0.08, n.energy * 0.3); n.fireLevel = 0; });
         stateRef.current = combined;
       } else {
+        // First-time user — empty network but particles & fog still render
         stateRef.current = { neurons: [], synapses: [], nextId: 0, totalSpeakTime: 0, sessionFires: 0 };
-        const ctx2 = c.getContext("2d");
-        if (ctx2) { ctx2.fillStyle = "#000000"; ctx2.fillRect(0, 0, c.width, c.height); }
       }
     } else if (screen === "summary" || screen === "history" || screen === "pick-category" || screen === "pick-passage" || screen === "custom") {
       const combined = buildCombinedState(c.width, c.height);
@@ -871,6 +959,59 @@ export default function Renew() {
     } else { setScreen(selectedCategory ? "pick-passage" : "home"); }
   }, [totalTime, neuronCount, synapseCount, selectedPassage, selectedCategory, customRef, stopListening, saveCurrentNetwork, currentStreak, longestStreak, disposeTone, playEndSound]);
 
+  // ─── Swipe-back navigation ───
+  const goBack = useCallback(() => {
+    switch (screen) {
+      case "pick-category": setScreen("home"); break;
+      case "pick-passage": setScreen("pick-category"); break;
+      case "custom": setScreen("pick-category"); break;
+      case "history": setScreen("home"); break;
+      case "summary": setSelectedPassage(null); setScreen(selectedCategory ? "pick-passage" : "home"); break;
+      // No swipe-back on home or session screens
+      default: break;
+    }
+  }, [screen, selectedCategory]);
+
+  const canSwipeBack = screen !== "home" && screen !== "session";
+
+  const handleTouchStart = useCallback((e) => {
+    if (!canSwipeBack) return;
+    const touch = e.touches[0];
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY, time: Date.now() };
+  }, [canSwipeBack]);
+
+  const handleTouchMove = useCallback((e) => {
+    if (!canSwipeBack) return;
+    const touch = e.touches[0];
+    const dx = touch.clientX - touchStartRef.current.x;
+    const dy = touch.clientY - touchStartRef.current.y;
+    // Only show indicator if swiping predominantly right and started from left edge area
+    if (dx > 10 && Math.abs(dy) < dx * 0.8 && touchStartRef.current.x < 60) {
+      const progress = Math.min(1, dx / 120);
+      if (swipeOverlayRef.current) {
+        swipeOverlayRef.current.style.opacity = progress * 0.6;
+        swipeOverlayRef.current.style.transform = `translateX(${Math.min(dx * 0.3, 30) - 30}px)`;
+      }
+    }
+  }, [canSwipeBack]);
+
+  const handleTouchEnd = useCallback((e) => {
+    if (!canSwipeBack) return;
+    // Reset overlay
+    if (swipeOverlayRef.current) {
+      swipeOverlayRef.current.style.opacity = 0;
+      swipeOverlayRef.current.style.transform = "translateX(-30px)";
+    }
+    const touch = e.changedTouches[0];
+    const dx = touch.clientX - touchStartRef.current.x;
+    const dy = touch.clientY - touchStartRef.current.y;
+    const dt = Date.now() - touchStartRef.current.time;
+    // Trigger if: swiped right >80px with horizontal dominance, started from left 80px edge, within 400ms
+    if (dx > 80 && Math.abs(dy) < dx * 0.7 && touchStartRef.current.x < 80 && dt < 400) {
+      goBack();
+    }
+  }, [canSwipeBack, goBack]);
+
   // ─── Render loop ───
   useEffect(() => {
     const c = canvasRef.current; if (!c) return;
@@ -995,10 +1136,16 @@ export default function Renew() {
         n.x = Math.max(20, Math.min(w - 20, n.x));
         n.y = Math.max(60, Math.min(h - 60, n.y));
         n.fireLevel *= 0.993;
-        // Animate dendrite growth — slowly extend toward targetLength
+        // Animate dendrite growth — slowly extend toward targetLength with unfurling curve
         for (const d of n.dendrites) {
           if (d.targetLength && d.length < d.targetLength) {
             d.length = Math.min(d.targetLength, d.length + 0.15); // slow organic extension
+            // Unfurling: curves deepen as dendrite extends, like a plant growing toward light
+            const growthPct = d.length / d.targetLength;
+            if (growthPct < 0.8) {
+              d.curve1 += (Math.random() - 0.5) * 0.02;
+              d.curve2 += (Math.random() - 0.5) * 0.02;
+            }
           }
         }
         n.maturity = Math.min(1, n.maturity + 0.0002); // new neurons take ~80 seconds to fully appear
@@ -1047,14 +1194,16 @@ export default function Renew() {
       }
 
       // ─── RENDER ───
-      ctx.fillStyle = "rgba(0, 0, 0, 0.08)"; // barely fading — light persists in the void
+      // Adaptive trail: ethereal ghost trails when speaking, cleaner when silent
+      const trailAlpha = isSessionScreen && spk ? 0.05 : 0.12;
+      ctx.fillStyle = `rgba(0, 0, 0, ${trailAlpha})`;
       ctx.fillRect(0, 0, w, h);
 
-      // Subtle depth fog gradient that breathes
+      // Subtle depth fog gradient that breathes — tied to drone rhythm
       const fogGradient = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.max(w, h) * 0.7);
-      const fogOpacity = (0.02 + breath * 0.03) * (isSessionScreen && spk ? 1 : 0.6);
-      fogGradient.addColorStop(0, `${spc.fogRGB}${fogOpacity * 0.08})`);
-      fogGradient.addColorStop(0.5, `${spc.fogRGB}${fogOpacity * 0.04})`);
+      const fogOpacity = (0.025 + breath * 0.045) * (isSessionScreen && spk ? 1.2 : 0.6);
+      fogGradient.addColorStop(0, `${spc.fogRGB}${fogOpacity * 0.1})`);
+      fogGradient.addColorStop(0.4, `${spc.fogRGB}${fogOpacity * 0.05})`);
       fogGradient.addColorStop(1, `${spc.fogRGB}0)`);
       ctx.fillStyle = fogGradient;
       ctx.beginPath(); ctx.arc(w / 2, h / 2, Math.max(w, h), 0, Math.PI * 2); ctx.fill();
@@ -1107,14 +1256,18 @@ export default function Renew() {
           ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
         }
 
-        // If forming, draw a reaching growth cone at the tip
+        // If forming, draw a reaching growth cone at the tip — dramatic flash that settles
         if (s.forming) {
           const [tipX, tipY] = bezPt(from.x, from.y, cpx, cpy, to.x, to.y, s.formProgress);
-          const tipGlow = ctx.createRadialGradient(tipX, tipY, 0, tipX, tipY, 8);
-          tipGlow.addColorStop(0, `${sc.brightRGB}0.5)`);
-          tipGlow.addColorStop(0.4, `${sc.fireRGB}0.2)`);
+          // Bright flash at beginning of formation, settles as it completes
+          const formIntensity = 1 - s.formProgress * 0.6;
+          const tipGlowR = 8 + (1 - s.formProgress) * 8; // larger at start
+          const tipGlow = ctx.createRadialGradient(tipX, tipY, 0, tipX, tipY, tipGlowR);
+          tipGlow.addColorStop(0, `rgba(255, 253, 255, ${0.4 * formIntensity})`); // white-hot center
+          tipGlow.addColorStop(0.2, `${sc.brightRGB}${0.5 * formIntensity})`);
+          tipGlow.addColorStop(0.5, `${sc.fireRGB}${0.2 * formIntensity})`);
           tipGlow.addColorStop(1, `${sc.fogRGB}0)`);
-          ctx.fillStyle = tipGlow; ctx.beginPath(); ctx.arc(tipX, tipY, 8, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = tipGlow; ctx.beginPath(); ctx.arc(tipX, tipY, tipGlowR, 0, Math.PI * 2); ctx.fill();
         }
 
         // Soft glow halo along high-strength synapses (skip if forming — no halo until complete)
@@ -1235,9 +1388,9 @@ export default function Renew() {
           }
         }
 
-        // ── Outer glow — wide, luminous, breathes ──
-        const glowR = (r + 25 + fire * 35 + energy * 14) * breathMod;
-        const glow = ctx.createRadialGradient(n.x, n.y, r * 0.3, n.x, n.y, glowR);
+        // ── Outer glow — wide, luminous, breathes — fluorescence microscopy style ──
+        const glowR = (r + 35 + fire * 45 + energy * 18) * breathMod;
+        const glow = ctx.createRadialGradient(n.x, n.y, r * 0.2, n.x, n.y, glowR);
         if (fire > 0.1) {
           glow.addColorStop(0, `${pc.brightRGB}${fire * 0.22 * lum})`);
           glow.addColorStop(0.15, `${pc.midRGB}${fire * 0.12 * lum})`);
@@ -1263,9 +1416,10 @@ export default function Renew() {
         // Very bright soma — near-white center with pillar tint
         const somaGrad = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, r * 1.15);
         if (fire > 0.2) {
-          somaGrad.addColorStop(0, `rgba(255, ${pc.soma[1]}, 255, ${(0.6 + fire * 0.35) * lum})`);
-          somaGrad.addColorStop(0.25, `${pc.brightRGB}${(0.45 + fire * 0.25) * lum})`);
-          somaGrad.addColorStop(0.6, `${pc.softRGB}${(0.2 + fire * 0.12) * lum})`);
+          // Sharp white-hot center when firing — like a crystalline flash
+          somaGrad.addColorStop(0, `rgba(255, 253, 255, ${Math.min(0.95, (0.65 + fire * 0.4)) * lum})`);
+          somaGrad.addColorStop(0.15, `${pc.brightRGB}${(0.5 + fire * 0.3) * lum})`);
+          somaGrad.addColorStop(0.5, `${pc.softRGB}${(0.22 + fire * 0.15) * lum})`);
           somaGrad.addColorStop(1, `${pc.dimRGB}${0.06 * lum})`);
         } else {
           somaGrad.addColorStop(0, `${pc.somaRGB}${(0.35 + energy * 0.35) * lum})`);
@@ -1287,6 +1441,21 @@ export default function Renew() {
           bg.addColorStop(0, `${pc.somaRGB}${blob.opacity * (1.2 + fire * 2.5) * lum})`);
           bg.addColorStop(1, `${pc.midRGB}0)`);
           ctx.fillStyle = bg; ctx.beginPath(); ctx.arc(bx, by, br, 0, Math.PI * 2); ctx.fill();
+        }
+
+        // ── Spawn glow ring — expanding ring when neuron is brand new ──
+        if (n.maturity < 0.15) {
+          const spawnPhase = n.maturity / 0.15; // 0 to 1 over first ~20 seconds
+          const ringR = 15 + spawnPhase * 40;
+          const ringAlpha = (1 - spawnPhase) * 0.2;
+          ctx.strokeStyle = `${pc.brightRGB}${ringAlpha})`;
+          ctx.lineWidth = 1.5 * (1 - spawnPhase);
+          ctx.beginPath(); ctx.arc(n.x, n.y, ringR, 0, Math.PI * 2); ctx.stroke();
+          // Soft glow fill
+          const spawnGlow = ctx.createRadialGradient(n.x, n.y, ringR * 0.5, n.x, n.y, ringR * 1.5);
+          spawnGlow.addColorStop(0, `${pc.fogRGB}${ringAlpha * 0.3})`);
+          spawnGlow.addColorStop(1, `${pc.deepRGB}0)`);
+          ctx.fillStyle = spawnGlow; ctx.beginPath(); ctx.arc(n.x, n.y, ringR * 1.5, 0, Math.PI * 2); ctx.fill();
         }
 
         // ── Bright nucleus — hot white center ──
@@ -1378,7 +1547,6 @@ export default function Renew() {
     <div style={{
       position: "absolute", inset: 0, zIndex: 20,
       display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-      background: "radial-gradient(ellipse at 50% 40%, rgba(124,106,255,0.06) 0%, rgba(79,70,229,0.02) 40%, #000 70%)",
       padding: "0 28px",
       paddingTop: "max(60px, env(safe-area-inset-top, 60px))",
       paddingBottom: "max(60px, calc(60px + env(safe-area-inset-bottom, 0px)))",
@@ -1386,6 +1554,12 @@ export default function Renew() {
       paddingRight: "max(28px, env(safe-area-inset-right, 28px))",
       fontFamily: FONT,
     }}>
+      {/* Breathing fog gradient — always present, slowly pulsing */}
+      <div style={{
+        position: "absolute", inset: 0, pointerEvents: "none",
+        background: "radial-gradient(ellipse at 50% 40%, rgba(124,106,255,0.07) 0%, rgba(79,70,229,0.025) 40%, transparent 70%)",
+        animation: "renewFogBreathe 12s ease-in-out infinite",
+      }} />
 
       {/* Logo mark — silky entrance */}
       <div style={{
@@ -1414,11 +1588,22 @@ export default function Renew() {
       </h1>
 
       <div style={{
-        height: 1, background: `linear-gradient(90deg, transparent, ${P.cardBorder}, transparent)`,
+        height: 1, position: "relative",
+        background: `linear-gradient(90deg, transparent, ${P.cardBorder}, transparent)`,
         margin: "10px 0",
         animation: "renewDividerGrow 1.2s cubic-bezier(0.22, 1, 0.36, 1) both",
         animationDelay: "0.65s",
-      }} />
+        overflow: "hidden",
+      }}>
+        {/* Shimmer — light catching a thin wire */}
+        <div style={{
+          position: "absolute", inset: 0,
+          background: "linear-gradient(90deg, transparent 30%, rgba(165,180,252,0.25) 50%, transparent 70%)",
+          backgroundSize: "200px 1px",
+          animation: "renewDividerShimmer 4s linear infinite",
+          animationDelay: "2s",
+        }} />
+      </div>
 
       {isFirstTime ? (
         <div style={{
@@ -1527,7 +1712,7 @@ export default function Renew() {
       paddingRight: "max(24px, env(safe-area-inset-right, 24px))",
       overflowY: "auto", fontFamily: FONT,
     }}>
-      <button className="renew-btn-tap" onClick={() => setScreen("home")} style={backBtn}>{"\u2190  back"}</button>
+      <button className="renew-btn-tap" onClick={() => setScreen("home")} style={backBtn}><svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ verticalAlign: "middle", marginRight: 6 }}><path d="M10 3L5 8L10 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>back</button>
       <div style={labelStyle}>Choose a pillar</div>
       <h2 style={{ color: P.white, fontSize: 18, fontWeight: 700, margin: "4px 0 22px", fontFamily: FONT, letterSpacing: 4 }}>
         SCRIPTURE
@@ -1542,17 +1727,20 @@ export default function Renew() {
             ...card, cursor: "pointer", display: "flex", alignItems: "center", gap: 14,
             textAlign: "left", position: "relative", overflow: "hidden", padding: "18px 18px 18px 22px",
             borderLeft: `3px solid ${accentCSS}`,
+            background: `linear-gradient(135deg, rgba(${cc[0]}, ${cc[1]}, ${cc[2]}, 0.04) 0%, ${P.card} 60%)`,
+            boxShadow: `inset 0 0 40px rgba(${cc[0]}, ${cc[1]}, ${cc[2]}, 0.03)`,
             animation: `renewStaggerIn 0.7s cubic-bezier(0.22, 1, 0.36, 1) both`,
             animationDelay: `${i * 0.08}s`,
           }}
-          onMouseEnter={e => { e.currentTarget.style.borderColor = accentCSS; e.currentTarget.style.background = P.surface; e.currentTarget.style.boxShadow = `0 0 20px rgba(${cc[0]}, ${cc[1]}, ${cc[2]}, 0.08)`; }}
-          onMouseLeave={e => { e.currentTarget.style.borderColor = P.cardBorder; e.currentTarget.style.borderLeftColor = accentCSS; e.currentTarget.style.background = P.card; e.currentTarget.style.boxShadow = "none"; }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = accentCSS; e.currentTarget.style.background = `linear-gradient(135deg, rgba(${cc[0]}, ${cc[1]}, ${cc[2]}, 0.08) 0%, ${P.surface} 60%)`; e.currentTarget.style.boxShadow = `0 0 25px rgba(${cc[0]}, ${cc[1]}, ${cc[2]}, 0.1), inset 0 0 40px rgba(${cc[0]}, ${cc[1]}, ${cc[2]}, 0.05)`; }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = P.cardBorder; e.currentTarget.style.borderLeftColor = accentCSS; e.currentTarget.style.background = `linear-gradient(135deg, rgba(${cc[0]}, ${cc[1]}, ${cc[2]}, 0.04) 0%, ${P.card} 60%)`; e.currentTarget.style.boxShadow = `inset 0 0 40px rgba(${cc[0]}, ${cc[1]}, ${cc[2]}, 0.03)`; }}
           >
-            <div>
+            <div style={{ flex: 1 }}>
               <div style={{ color: P.text, fontSize: 13, fontWeight: 700, fontFamily: FONT, letterSpacing: 3 }}>{cat.name}</div>
               <div style={{ color: P.textSoft, fontSize: 10, fontFamily: FONT_BODY, fontWeight: 400, marginTop: 2 }}>{cat.subtitle}</div>
               <div style={{ color: P.textDim, fontSize: 9, fontFamily: FONT, marginTop: 4, letterSpacing: 0.5 }}>{cat.passages.length} passages</div>
             </div>
+            <div style={{ fontSize: 22, opacity: 0.35, filter: `drop-shadow(0 0 8px rgba(${cc[0]}, ${cc[1]}, ${cc[2]}, 0.3))` }}>{cat.icon}</div>
           </button>
         );
         })}
@@ -1566,7 +1754,7 @@ export default function Renew() {
   };
 
   const renderPickPassage = () => (
-    <div className="renew-smooth-scroll" style={{
+    <div className="renew-smooth-scroll renew-scroll-container" style={{
       position: "absolute", inset: 0, zIndex: 20,
       display: "flex", flexDirection: "column",
       background: "rgba(0,0,0,0.88)", padding: 24,
@@ -1576,7 +1764,7 @@ export default function Renew() {
       paddingRight: "max(24px, env(safe-area-inset-right, 24px))",
       overflowY: "auto", fontFamily: FONT,
     }}>
-      <button className="renew-btn-tap" onClick={() => setScreen("pick-category")} style={backBtn}>{"\u2190  back"}</button>
+      <button className="renew-btn-tap" onClick={() => setScreen("pick-category")} style={backBtn}><svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ verticalAlign: "middle", marginRight: 6 }}><path d="M10 3L5 8L10 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>back</button>
       <div style={{ marginBottom: 4 }}>
         <div style={labelStyle}>Pillar</div>
         <h2 style={{ color: P.white, fontSize: 16, fontWeight: 700, margin: "4px 0 0", fontFamily: FONT, letterSpacing: 3 }}>{selectedCategory?.name}</h2>
@@ -1645,7 +1833,7 @@ export default function Renew() {
       paddingRight: "max(24px, env(safe-area-inset-right, 24px))",
       fontFamily: FONT,
     }}>
-      <button className="renew-btn-tap" onClick={() => setScreen("home")} style={backBtn}>{"\u2190  back"}</button>
+      <button className="renew-btn-tap" onClick={() => setScreen("home")} style={backBtn}><svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ verticalAlign: "middle", marginRight: 6 }}><path d="M10 3L5 8L10 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>back</button>
       <div style={labelStyle}>Custom passage</div>
       <h2 style={{ color: P.white, fontSize: 16, fontWeight: 700, margin: "4px 0 24px", fontFamily: FONT, letterSpacing: 2 }}>
         Enter your Scripture
@@ -1653,19 +1841,19 @@ export default function Renew() {
 
       <div style={{ marginBottom: 16 }}>
         <div style={{ ...labelStyle, marginBottom: 8 }}>Reference</div>
-        <input value={customRef} onChange={e => setCustomRef(e.target.value)}
+        <input className="renew-input" value={customRef} onChange={e => setCustomRef(e.target.value)}
           placeholder="e.g. Psalm 91:1-2"
           style={{
             width: "100%", boxSizing: "border-box",
             background: P.surface, border: `1px solid ${P.cardBorder}`,
             borderRadius: 10, padding: "13px 16px", color: P.text, fontSize: 13,
             fontFamily: FONT, outline: "none", fontWeight: 400,
-            transition: "border-color 0.25s",
+            transition: "border-color 0.3s, box-shadow 0.3s",
           }} />
       </div>
       <div style={{ marginBottom: 28 }}>
         <div style={{ ...labelStyle, marginBottom: 8 }}>Scripture text</div>
-        <textarea value={customText} onChange={e => setCustomText(e.target.value)}
+        <textarea className="renew-input" value={customText} onChange={e => setCustomText(e.target.value)}
           placeholder="Type or paste the Scripture here..."
           rows={6}
           style={{
@@ -1673,7 +1861,7 @@ export default function Renew() {
             background: P.surface, border: `1px solid ${P.cardBorder}`,
             borderRadius: 10, padding: "13px 16px", color: P.text, fontSize: 13,
             fontFamily: FONT_BODY, outline: "none", resize: "vertical", lineHeight: 1.85, fontWeight: 300,
-            transition: "border-color 0.25s",
+            transition: "border-color 0.3s, box-shadow 0.3s",
           }} />
       </div>
 
@@ -1719,7 +1907,7 @@ export default function Renew() {
             { val: fmtTime(totalTime), label: "Speaking", color: P.accent },
           ].map((s, i) => (
             <div key={i} style={{ textAlign: "right" }}>
-              <div style={{ color: s.color, fontSize: 15, fontWeight: 700, fontFamily: FONT }}>{s.val}</div>
+              <div style={{ color: s.color, fontSize: 15, fontWeight: 700, fontFamily: FONT, textShadow: `0 0 12px ${s.color}44`, animation: "renewBreathe 6s ease-in-out infinite", animationDelay: `${i * 0.5}s` }}>{s.val}</div>
               <div style={{ ...statLabel, fontSize: 7 }}>{s.label}</div>
             </div>
           ))}
@@ -1731,11 +1919,15 @@ export default function Renew() {
         <div style={{ position: "absolute", top: "calc(56px + env(safe-area-inset-top, 0px))", left: 14, right: 14, zIndex: 10 }}>
           <div style={{
             ...card, padding: "14px 18px",
-            background: isSpeaking ? "rgba(10,10,10,0.75)" : "rgba(10,10,10,0.45)",
+            background: isSpeaking
+              ? `linear-gradient(135deg, rgba(${sessionPillarUI.fire[0]}, ${sessionPillarUI.fire[1]}, ${sessionPillarUI.fire[2]}, 0.06) 0%, rgba(10,10,10,0.75) 40%)`
+              : "linear-gradient(135deg, rgba(20,18,15,0.5) 0%, rgba(10,10,10,0.45) 100%)",
             backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)",
-            borderColor: isSpeaking ? `rgba(${sessionPillarUI.fire[0]}, ${sessionPillarUI.fire[1]}, ${sessionPillarUI.fire[2]}, 0.25)` : "rgba(255,255,255,0.06)",
+            borderColor: isSpeaking ? `rgba(${sessionPillarUI.fire[0]}, ${sessionPillarUI.fire[1]}, ${sessionPillarUI.fire[2]}, 0.2)` : "rgba(255,245,230,0.06)",
             transition: "all 0.5s", maxHeight: 130, overflowY: "auto",
-            boxShadow: isSpeaking ? `0 0 30px rgba(${sessionPillarUI.fire[0]}, ${sessionPillarUI.fire[1]}, ${sessionPillarUI.fire[2]}, 0.06)` : "none",
+            boxShadow: isSpeaking
+              ? `0 0 30px rgba(${sessionPillarUI.fire[0]}, ${sessionPillarUI.fire[1]}, ${sessionPillarUI.fire[2]}, 0.08), inset 0 1px 0 rgba(255,245,230,0.04)`
+              : "inset 0 1px 0 rgba(255,245,230,0.03)",
           }}>
             <div style={{ color: pillarAccentCSS, fontSize: 9, fontWeight: 700, marginBottom: 8, letterSpacing: 2, textTransform: "uppercase", fontFamily: FONT }}>
               {selectedPassage.ref}
@@ -1780,36 +1972,69 @@ export default function Renew() {
           </div>
         </div>
 
-        {/* Live waveform visualizer — organic with varied widths and glow */}
-        <div style={{
-          display: "flex", alignItems: "center", gap: 2, height: 32,
-          padding: "0 12px",
-        }}>
-          {Array.from({length: 20}, (_, i) => {
-            const center = 9.5;
-            const dist = Math.abs(i - center) / center;
-            const wave = 1 - dist * 0.65;
-            const phase = Date.now() * 0.004 + i * 0.5;
-            const ripple = Math.sin(phase) * 0.3 + 0.7;
-            const h = isSpeaking
-              ? 4 + volume * 60 * wave * ripple
-              : 2 + Math.sin(Date.now() * 0.002 + i * 0.4) * 1.2;
-            const barWidth = 1.8 + Math.sin(i * 0.7) * 0.6; // varied widths
-            return (
-              <div key={i} style={{
-                width: barWidth, borderRadius: 3,
-                background: isSpeaking
-                  ? `rgba(${sessionPillarUI.fire[0]}, ${sessionPillarUI.fire[1]}, ${sessionPillarUI.fire[2]}, ${0.5 + volume * 0.5})`
-                  : P.textDim,
-                height: `${h}px`,
-                transition: "height 0.06s ease-out, background 0.3s",
-                opacity: isSpeaking ? 0.65 + volume * 0.35 : 0.2,
-                boxShadow: isSpeaking && volume > 0.08
-                  ? `0 0 ${5 + volume * 10}px rgba(${sessionPillarUI.fire[0]}, ${sessionPillarUI.fire[1]}, ${sessionPillarUI.fire[2]}, ${volume * 0.35})`
-                  : "none",
-              }} />
-            );
-          })}
+        {/* Live waveform visualizer — organic with reflection */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0 }}>
+          <div style={{
+            display: "flex", alignItems: "flex-end", gap: 2, height: 32,
+            padding: "0 12px",
+          }}>
+            {Array.from({length: 20}, (_, i) => {
+              const center = 9.5;
+              const dist = Math.abs(i - center) / center;
+              const wave = 1 - dist * 0.65;
+              const phase = Date.now() * 0.004 + i * 0.5;
+              const ripple = Math.sin(phase) * 0.3 + 0.7;
+              const h = isSpeaking
+                ? 4 + volume * 60 * wave * ripple
+                : 2 + Math.sin(Date.now() * 0.002 + i * 0.4) * 1.2;
+              const barWidth = 1.8 + Math.sin(i * 0.7) * 0.6;
+              return (
+                <div key={i} style={{
+                  width: barWidth, borderRadius: "3px 3px 1px 1px",
+                  background: isSpeaking
+                    ? `rgba(${sessionPillarUI.fire[0]}, ${sessionPillarUI.fire[1]}, ${sessionPillarUI.fire[2]}, ${0.5 + volume * 0.5})`
+                    : P.textDim,
+                  height: `${h}px`,
+                  transition: "height 0.06s ease-out, background 0.3s",
+                  opacity: isSpeaking ? 0.65 + volume * 0.35 : 0.2,
+                  boxShadow: isSpeaking && volume > 0.08
+                    ? `0 0 ${5 + volume * 10}px rgba(${sessionPillarUI.fire[0]}, ${sessionPillarUI.fire[1]}, ${sessionPillarUI.fire[2]}, ${volume * 0.35})`
+                    : "none",
+                }} />
+              );
+            })}
+          </div>
+          {/* Reflection — faint mirror below */}
+          <div style={{
+            display: "flex", alignItems: "flex-start", gap: 2, height: 10,
+            padding: "0 12px", opacity: isSpeaking ? 0.15 : 0.05,
+            transform: "scaleY(-1)", filter: "blur(1px)",
+            maskImage: "linear-gradient(to bottom, rgba(0,0,0,0.4), transparent)",
+            WebkitMaskImage: "linear-gradient(to bottom, rgba(0,0,0,0.4), transparent)",
+            transition: "opacity 0.3s",
+          }}>
+            {Array.from({length: 20}, (_, i) => {
+              const center = 9.5;
+              const dist = Math.abs(i - center) / center;
+              const wave = 1 - dist * 0.65;
+              const phase = Date.now() * 0.004 + i * 0.5;
+              const ripple = Math.sin(phase) * 0.3 + 0.7;
+              const h = isSpeaking
+                ? Math.min(10, (4 + volume * 60 * wave * ripple) * 0.3)
+                : Math.min(10, (2 + Math.sin(Date.now() * 0.002 + i * 0.4) * 1.2) * 0.3);
+              const barWidth = 1.8 + Math.sin(i * 0.7) * 0.6;
+              return (
+                <div key={i} style={{
+                  width: barWidth, borderRadius: 1,
+                  background: isSpeaking
+                    ? `rgba(${sessionPillarUI.fire[0]}, ${sessionPillarUI.fire[1]}, ${sessionPillarUI.fire[2]}, 0.5)`
+                    : P.textDim,
+                  height: `${h}px`,
+                  transition: "height 0.06s ease-out",
+                }} />
+              );
+            })}
+          </div>
         </div>
 
         <span style={{
@@ -1837,14 +2062,15 @@ export default function Renew() {
         }}>END</button>
       </div>
 
-      {/* Speaking vignette pulse — syncs with volume */}
-      {isSpeaking && (
-        <div style={{
-          position: "absolute", inset: 0, pointerEvents: "none", zIndex: 5,
-          boxShadow: `inset 0 0 ${60 + volume * 100}px rgba(${sessionPillarUI.fire[0]}, ${sessionPillarUI.fire[1]}, ${sessionPillarUI.fire[2]}, ${0.02 + volume * 0.12})`,
-          transition: "box-shadow 0.15s ease-out",
-        }} />
-      )}
+      {/* Vignette — pulses with voice when speaking, dims to quiet anticipation when listening */}
+      <div style={{
+        position: "absolute", inset: 0, pointerEvents: "none", zIndex: 5,
+        boxShadow: isSpeaking
+          ? `inset 0 0 ${60 + volume * 100}px rgba(${sessionPillarUI.fire[0]}, ${sessionPillarUI.fire[1]}, ${sessionPillarUI.fire[2]}, ${0.02 + volume * 0.12})`
+          : "inset 0 0 120px rgba(0,0,0,0.4)",
+        transition: isSpeaking ? "box-shadow 0.15s ease-out" : "box-shadow 1.5s ease-in-out",
+        opacity: isSpeaking ? 1 : 0.8,
+      }} />
     </>
   );
 
@@ -1869,9 +2095,30 @@ export default function Renew() {
         paddingRight: "max(28px, env(safe-area-inset-right, 28px))",
         fontFamily: FONT,
       }}>
+        {/* Radial light burst behind "Well done" */}
+        <div style={{
+          position: "absolute", top: "30%", left: "50%", transform: "translate(-50%, -50%)",
+          width: 300, height: 300, borderRadius: "50%",
+          background: `radial-gradient(circle, rgba(${sessionPillarUI.fire[0]}, ${sessionPillarUI.fire[1]}, ${sessionPillarUI.fire[2]}, 0.08) 0%, transparent 70%)`,
+          animation: "renewRadialBurst 2s cubic-bezier(0.22, 1, 0.36, 1) both",
+          animationDelay: "0.3s",
+          pointerEvents: "none",
+        }} />
+        {/* Expanding concentric rings */}
+        {[0, 1, 2].map(ri => (
+          <div key={ri} style={{
+            position: "absolute", top: "30%", left: "50%", transform: "translate(-50%, -50%)",
+            width: 200, height: 200, borderRadius: "50%",
+            border: `1px solid rgba(${sessionPillarUI.fire[0]}, ${sessionPillarUI.fire[1]}, ${sessionPillarUI.fire[2]}, 0.08)`,
+            animation: "renewRingExpand 3s ease-out both",
+            animationDelay: `${0.5 + ri * 0.6}s`,
+            pointerEvents: "none",
+          }} />
+        ))}
+
         <div style={{
           animation: "renewFadeInUp 0.9s cubic-bezier(0.22, 1, 0.36, 1) both",
-          animationDelay: "0.1s", textAlign: "center",
+          animationDelay: "0.1s", textAlign: "center", position: "relative",
         }}>
           <div style={labelStyle}>Session complete</div>
           <h2 style={{ color: P.white, fontSize: 22, fontWeight: 300, margin: "6px 0 4px", letterSpacing: 1.5, fontFamily: FONT_BODY }}>
@@ -1904,11 +2151,11 @@ export default function Renew() {
             {growthItems.map((item, idx) => (
               <div key={idx} style={{
                 display: "flex", justifyContent: "space-between", alignItems: "center",
-                animation: "renewStaggerIn 0.7s cubic-bezier(0.22, 1, 0.36, 1) both",
-                animationDelay: `${0.7 + idx * 0.12}s`,
+                animation: "renewAchievementFlash 0.8s cubic-bezier(0.22, 1, 0.36, 1) both",
+                animationDelay: `${0.7 + idx * 0.18}s`,
               }}>
                 <span style={{ color: P.textSoft, fontSize: 11, fontFamily: FONT_BODY }}>{item.label}</span>
-                <span style={{ color: item.color, fontSize: 14, fontWeight: 700, fontFamily: FONT }}>{item.value}</span>
+                <span style={{ color: item.color, fontSize: 14, fontWeight: 700, fontFamily: FONT, textShadow: `0 0 8px ${item.color}33` }}>{item.value}</span>
               </div>
             ))}
             {growthItems.length === 0 && (
@@ -1942,7 +2189,11 @@ export default function Renew() {
           animation: "renewFadeInUp 0.9s cubic-bezier(0.22, 1, 0.36, 1) both",
           animationDelay: "1s", display: "flex", flexDirection: "column", alignItems: "center",
         }}>
-          <button className="renew-btn-tap" onClick={() => { setSelectedPassage(null); setScreen(selectedCategory ? "pick-passage" : "home"); }} style={btnMain}>
+          <button className="renew-btn-tap" onClick={() => { setSelectedPassage(null); setScreen(selectedCategory ? "pick-passage" : "home"); }} style={{
+            ...btnMain,
+            background: "linear-gradient(135deg, #8B7AFF 0%, #7C6AFF 40%, #9B8AFF 100%)",
+            boxShadow: "0 0 35px rgba(155,138,255,0.25), 0 2px 12px rgba(0,0,0,0.3)",
+          }}>
             Continue
           </button>
           <button className="renew-btn-tap" onClick={() => { setSelectedPassage(null); setScreen("home"); }} style={{ ...btnGhost, marginTop: 12 }}>
@@ -1954,7 +2205,7 @@ export default function Renew() {
   };
 
   const renderHistory = () => (
-    <div className="renew-smooth-scroll" style={{
+    <div className="renew-smooth-scroll renew-scroll-container" style={{
       position: "absolute", inset: 0, zIndex: 20,
       display: "flex", flexDirection: "column",
       background: "rgba(0,0,0,0.85)",
@@ -1966,7 +2217,7 @@ export default function Renew() {
       paddingRight: "max(24px, env(safe-area-inset-right, 24px))",
       overflowY: "auto", fontFamily: FONT,
     }}>
-      <button className="renew-btn-tap" onClick={() => setScreen("home")} style={backBtn}>{"\u2190  back"}</button>
+      <button className="renew-btn-tap" onClick={() => setScreen("home")} style={backBtn}><svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ verticalAlign: "middle", marginRight: 6 }}><path d="M10 3L5 8L10 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>back</button>
       <div style={labelStyle}>Your journey</div>
       <h2 style={{ color: P.white, fontSize: 18, fontWeight: 700, margin: "4px 0 22px", fontFamily: FONT, letterSpacing: 3 }}>
         History & Stats
@@ -1981,35 +2232,45 @@ export default function Renew() {
         ].map((s, i) => (
           <div key={i} style={{
             ...card, padding: "12px 6px", flex: 1, textAlign: "center",
+            background: `linear-gradient(180deg, rgba(${s.color === P.accent ? '124,106,255' : s.color === P.streak ? '251,146,60' : s.color === P.fire ? '192,132,252' : '165,180,252'}, 0.04) 0%, ${P.card} 100%)`,
             animation: `renewStaggerIn 0.7s cubic-bezier(0.22, 1, 0.36, 1) both`,
             animationDelay: `${i * 0.08}s`,
           }}>
-            <div style={{ ...statNum(s.color), fontSize: 16 }}>{s.value}</div>
+            <div style={{ ...statNum(s.color), fontSize: 16, textShadow: `0 0 10px ${s.color}33` }}>{s.value}</div>
             <div style={{ ...statLabel, fontSize: 7 }}>{s.label}</div>
           </div>
         ))}
       </div>
 
       <div style={{ ...labelStyle, marginBottom: 10 }}>Past sessions</div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        {[...sessionHistory].reverse().map((s, i) => (
+      <div style={{ display: "flex", flexDirection: "column", gap: 0, position: "relative" }}>
+        {/* Timeline vertical line */}
+        {sessionHistory.length > 0 && (
+          <div style={{
+            position: "absolute", left: 18, top: 10, bottom: 10, width: 1,
+            background: `linear-gradient(180deg, ${P.cardBorder}, rgba(124,106,255,0.12), ${P.cardBorder})`,
+          }} />
+        )}
+        {[...sessionHistory].reverse().map((s, i) => {
+          // Find pillar color from passage reference
+          const pillarCat = SCRIPTURE_CATEGORIES.find(c => c.passages.some(p => p.ref === s.ref));
+          const pc = pillarCat ? getPillarColors(pillarCat.name).fire : [124, 106, 255];
+          const refColor = `rgb(${pc[0]}, ${pc[1]}, ${pc[2]})`;
+          return (
           <div key={i} style={{
-            ...card, padding: "12px 14px",
+            ...card, padding: "12px 14px 12px 42px",
             display: "flex", alignItems: "center", gap: 12,
+            marginBottom: 6, position: "relative", borderLeft: "none",
           }}>
+            {/* Timeline node */}
             <div style={{
-              width: 36, height: 36, borderRadius: 8,
-              background: P.surface, display: "flex", alignItems: "center", justifyContent: "center",
-              border: `1px solid ${P.cardBorder}`,
-            }}>
-              <div style={{
-                width: 8, height: 8, borderRadius: "50%",
-                background: `radial-gradient(circle, ${P.neuronCore}, ${P.synapse})`,
-                boxShadow: `0 0 8px ${P.accentGlow}`,
-              }} />
-            </div>
+              position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)",
+              width: 12, height: 12, borderRadius: "50%", zIndex: 2,
+              background: `radial-gradient(circle, ${refColor}, rgba(${pc[0]}, ${pc[1]}, ${pc[2]}, 0.3))`,
+              boxShadow: `0 0 8px rgba(${pc[0]}, ${pc[1]}, ${pc[2]}, 0.3)`,
+            }} />
             <div style={{ flex: 1 }}>
-              <div style={{ color: P.text, fontSize: 12, fontWeight: 600, fontFamily: FONT }}>{s.ref}</div>
+              <div style={{ color: refColor, fontSize: 12, fontWeight: 600, fontFamily: FONT }}>{s.ref}</div>
               <div style={{ color: P.textDim, fontSize: 9, fontFamily: FONT }}>
                 {new Date(s.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
               </div>
@@ -2019,11 +2280,29 @@ export default function Renew() {
               <div style={{ color: P.textDim, fontSize: 9, fontFamily: FONT }}>{s.neurons} neurons</div>
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
       {sessionHistory.length === 0 && (
-        <div style={{ color: P.textDim, fontSize: 11, textAlign: "center", marginTop: 40, fontFamily: FONT }}>
-          No sessions yet. Start speaking the Word.
+        <div style={{ textAlign: "center", marginTop: 50, padding: "0 20px" }}>
+          {/* Poetic empty state with faint neural sketch */}
+          <div style={{
+            width: 48, height: 48, borderRadius: "50%", margin: "0 auto 16px",
+            background: "radial-gradient(circle, rgba(165,180,252,0.08), transparent 70%)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
+            <div style={{
+              width: 6, height: 6, borderRadius: "50%",
+              background: "radial-gradient(circle, rgba(165,180,252,0.3), rgba(99,85,216,0.1))",
+              boxShadow: "0 0 12px rgba(165,180,252,0.15)",
+            }} />
+          </div>
+          <div style={{ color: P.textDim, fontSize: 12, fontFamily: FONT_BODY, fontWeight: 300, lineHeight: 1.8 }}>
+            Your story begins with a single verse.
+          </div>
+          <div style={{ color: P.textGhost, fontSize: 10, fontFamily: FONT_BODY, fontWeight: 300, marginTop: 6 }}>
+            Speak it aloud and watch something grow.
+          </div>
         </div>
       )}
     </div>
@@ -2047,13 +2326,46 @@ export default function Renew() {
     <div className="renew-noise" style={{
       background: P.black, width: "100%", height: "100%",
       position: "relative", overflow: "hidden", fontFamily: FONT,
-    }}>
+    }}
+    onTouchStart={handleTouchStart}
+    onTouchMove={handleTouchMove}
+    onTouchEnd={handleTouchEnd}
+    >
+      {/* Swipe-back edge indicator */}
+      {canSwipeBack && (
+        <div ref={swipeOverlayRef} style={{
+          position: "absolute", left: 0, top: 0, bottom: 0, width: 32, zIndex: 200,
+          background: "linear-gradient(90deg, rgba(124,106,255,0.15), transparent)",
+          opacity: 0, transform: "translateX(-30px)",
+          transition: "opacity 0.15s ease-out, transform 0.15s ease-out",
+          pointerEvents: "none",
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style={{ opacity: 0.7, marginLeft: 4 }}>
+            <path d="M10 3L5 8L10 13" stroke="rgba(165,180,252,0.8)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </div>
+      )}
       <div style={{ position: "absolute", inset: 0 }}>
         <canvas ref={canvasRef} style={{ display: "block", width: "100%", height: "100%" }} />
       </div>
       <div key={screen} className={screen !== "session" ? "renew-screen-enter" : ""} style={{ position: "absolute", inset: 0, zIndex: 10 }}>
         {screenContent}
       </div>
+      {/* Loading state — logo dot materializing then dissolving */}
+      {!appLoaded && (
+        <div style={{
+          position: "absolute", inset: 0, zIndex: 100,
+          background: "#000", display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          <div style={{
+            width: 9, height: 9, borderRadius: "50%",
+            background: "radial-gradient(circle, #A5B4FC, #6366F1)",
+            boxShadow: "0 0 30px rgba(165,180,252,0.5), 0 0 60px rgba(124,106,255,0.2)",
+            animation: "renewLogoEntrance 0.8s cubic-bezier(0.22, 1, 0.36, 1) both",
+          }} />
+        </div>
+      )}
     </div>
   );
 }
