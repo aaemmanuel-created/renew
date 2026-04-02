@@ -1205,7 +1205,7 @@ export default function Renew() {
       background: "radial-gradient(ellipse at 50% 40%, rgba(124,106,255,0.04) 0%, #000 70%)",
       padding: "0 28px",
       paddingTop: "max(28px, env(safe-area-inset-top, 28px))",
-      paddingBottom: "max(220px, calc(220px + env(safe-area-inset-bottom, 0px)))",
+      paddingBottom: "max(190px, calc(190px + env(safe-area-inset-bottom, 0px)))",
       paddingLeft: "max(28px, env(safe-area-inset-left, 28px))",
       paddingRight: "max(28px, env(safe-area-inset-right, 28px))",
       fontFamily: FONT,
@@ -1216,7 +1216,7 @@ export default function Renew() {
         width: 36, height: 36, borderRadius: "50%",
         background: "radial-gradient(circle, rgba(165,180,252,0.2), transparent 70%)",
         display: "flex", alignItems: "center", justifyContent: "center",
-        marginBottom: 14,
+        marginBottom: 10,
       }}>
         <div style={{
           width: 8, height: 8, borderRadius: "50%",
@@ -1233,7 +1233,7 @@ export default function Renew() {
       </h1>
 
       <div style={{
-        width: 32, height: 1, background: P.cardBorder, margin: "10px 0",
+        width: 32, height: 1, background: P.cardBorder, margin: "8px 0",
       }} />
 
       {isFirstTime ? (
@@ -1247,7 +1247,7 @@ export default function Renew() {
           </p>
           <p style={{
             color: P.textDim, fontSize: 11, fontWeight: 300, textAlign: "center",
-            maxWidth: 280, lineHeight: 1.6, margin: "0 0 20px", fontFamily: FONT,
+            maxWidth: 280, lineHeight: 1.6, margin: "0 0 14px", fontFamily: FONT,
           }}>
             And watch what grows.
           </p>
@@ -1262,7 +1262,7 @@ export default function Renew() {
           </p>
           <p style={{
             color: P.textDim, fontSize: 10, fontWeight: 400, textAlign: "center",
-            maxWidth: 300, lineHeight: 1.5, margin: "0 0 20px", fontFamily: FONT,
+            maxWidth: 300, lineHeight: 1.5, margin: "0 0 14px", fontFamily: FONT,
           }}>
             {lifetimeNeurons} neurons formed across {sessionHistory.length} session{sessionHistory.length !== 1 ? "s" : ""}.
           </p>
