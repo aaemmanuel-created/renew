@@ -244,33 +244,15 @@ if (!document.getElementById(STYLE_ID)) {
     /* Screen transitions Ã¢ÂÂ silk float-in */
     .renew-screen-enter {
       animation: renewScreenEnter 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
-
-    /* Splash screen animations */
-    @keyframes renewSplashLogo {
-      0% { opacity: 0; transform: scale(0.7); filter: blur(12px); }
-      60% { opacity: 1; transform: scale(1.05); filter: blur(0px); }
-      100% { opacity: 1; transform: scale(1); filter: blur(0px); }
     }
-    @keyframes renewSplashTitle {
-      0% { opacity: 0; letter-spacing: 20px; filter: blur(8px); }
-      100% { opacity: 1; letter-spacing: 8px; filter: blur(0px); }
-    }
-    @keyframes renewSplashTagline {
-      0% { opacity: 0; transform: translateY(10px); }
-      100% { opacity: 0.6; transform: translateY(0); }
-    }
-    @keyframes renewSplashPrompt {
-      0%, 100% { opacity: 0.3; }
-      50% { opacity: 0.7; }
-    }
+    /* Splash exit and login enter transitions */
     @keyframes renewSplashExit {
       0% { opacity: 1; transform: scale(1); filter: blur(0px); }
-      100% { opacity: 0; transform: scale(1.1); filter: blur(20px); }
+      100% { opacity: 0; transform: scale(1.05); filter: blur(20px); }
     }
     @keyframes renewLoginEnter {
-      0% { opacity: 0; transform: translateY(30px) scale(0.96); filter: blur(8px); }
-      100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0px); }
-    }
+      0% { opacity: 0; transform: translateY(20px); filter: blur(8px); }
+      100% { opacity: 1; transform: translateY(0); filter: blur(0px); }
     }
   `;
   document.head.appendChild(styleEl);
@@ -2626,161 +2608,251 @@ export default function Renew() {
 
     if (showSplash) {
       return (
-        <div style={{
+        <div className="renew-noise" style={{
           background: "#000", width: "100%", height: "100vh",
           display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-          position: "relative", overflow: "hidden", cursor: "pointer", fontFamily: FONT,
+          position: "relative", overflow: "hidden", fontFamily: FONT,
           animation: splashExiting ? "renewSplashExit 0.7s cubic-bezier(0.22,1,0.36,1) forwards" : "none",
-        }} onClick={handleSplashContinue}>
+        }}>
+          {/* Breathing fog — same as home */}
           <div style={{ position: "absolute", inset: 0, pointerEvents: "none",
-            background: "radial-gradient(ellipse at 50% 40%, rgba(124,106,255,0.06) 0%, transparent 70%)",
+            background: "radial-gradient(ellipse at 50% 40%, rgba(124,106,255,0.06) 0%, transparent 65%)",
             animation: "renewFogBreathe 12s ease-in-out infinite",
           }} />
+
+          {/* Logo orb — matches home screen size */}
           <div style={{
-            width: 72, height: 72, borderRadius: "50%",
-            background: "radial-gradient(circle, rgba(165,180,252,0.18), rgba(79,70,229,0.08))",
-            display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 32,
-            animation: "renewSplashLogo 1.6s cubic-bezier(0.22,1,0.36,1) both",
-            boxShadow: "0 0 40px rgba(124,106,255,0.15), 0 0 80px rgba(124,106,255,0.08)",
+            width: 44, height: 44, borderRadius: "50%",
+            background: "radial-gradient(circle, rgba(165,180,252,0.18), rgba(79,70,229,0.06) 60%, transparent 80%)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            marginBottom: 14,
+            animation: "renewLogoEntrance 1.4s cubic-bezier(0.22, 1, 0.36, 1) both",
           }}>
             <div style={{
-              width: 14, height: 14, borderRadius: "50%",
+              width: 9, height: 9, borderRadius: "50%",
               background: "radial-gradient(circle, #A5B4FC, #6366F1)",
-              boxShadow: "0 0 20px rgba(165,180,252,0.5), 0 0 40px rgba(124,106,255,0.3)",
-              animation: "renewPulseGlow 2s ease-in-out infinite",
+              boxShadow: "0 0 20px rgba(165,180,252,0.5), 0 0 40px rgba(124,106,255,0.15)",
             }} />
           </div>
-          <h1 style={{ color: "#fff", fontSize: 28, fontWeight: 700, margin: 0, fontFamily: FONT,
-            textTransform: "uppercase", animation: "renewSplashTitle 1.4s cubic-bezier(0.22,1,0.36,1) 0.3s both",
+
+          {/* RENEW title — matches home screen */}
+          <h1 style={{
+            color: P.white, fontSize: 15, fontWeight: 700, margin: 0,
+            letterSpacing: 8, textTransform: "uppercase", fontFamily: FONT,
+            animation: "renewFadeInUp 1s cubic-bezier(0.22, 1, 0.36, 1) both",
+            animationDelay: "0.4s",
           }}>RENEW</h1>
-          <p style={{ color: P.textSoft, fontSize: 13, fontWeight: 300, fontFamily: FONT_BODY,
-            textAlign: "center", lineHeight: 1.6, marginTop: 14, marginBottom: 0,
-            animation: "renewSplashTagline 1.2s cubic-bezier(0.22,1,0.36,1) 0.8s both",
-          }}>speak the Word &middot; renew your mind</p>
-          <div style={{ position: "absolute", bottom: "max(20px, env(safe-area-inset-bottom, 20px))",
-            left: 20, right: 20, textAlign: "center",
+
+          {/* Divider with shimmer — matches home screen */}
+          <div style={{
+            width: 120, height: 1, position: "relative",
+            background: `linear-gradient(90deg, transparent, ${P.cardBorder}, transparent)`,
+            margin: "10px 0",
+            animation: "renewDividerGrow 1.2s cubic-bezier(0.22, 1, 0.36, 1) both",
+            animationDelay: "0.65s",
+            overflow: "hidden",
           }}>
-            <div style={{ color: P.textGhost, fontSize: 9, fontStyle: "italic", lineHeight: 1.6,
-              animation: "renewSplashTagline 1.2s cubic-bezier(0.22,1,0.36,1) 1.2s both",
-            }}>"This Book of the Law shall not depart from your mouth..."</div>
-            <div style={{ color: P.textGhost, fontSize: 8, marginTop: 4, fontWeight: 700,
-              animation: "renewSplashTagline 1.2s cubic-bezier(0.22,1,0.36,1) 1.4s both",
-            }}>JOSHUA 1:8</div>
+            <div style={{
+              position: "absolute", inset: 0,
+              background: "linear-gradient(90deg, transparent 30%, rgba(165,180,252,0.25) 50%, transparent 70%)",
+              backgroundSize: "200px 1px",
+              animation: "renewDividerShimmer 4s linear infinite",
+              animationDelay: "2s",
+            }} />
           </div>
-          <div style={{ marginTop: 48, color: P.textDim, fontSize: 11, fontFamily: FONT_BODY,
-            letterSpacing: 2, textTransform: "uppercase",
-            animation: "renewSplashPrompt 2.5s ease-in-out 2s infinite both",
-          }}>tap to continue</div>
+
+          {/* Tagline — matches home screen first-time user */}
+          <div style={{
+            animation: "renewFadeInUp 1.1s cubic-bezier(0.22, 1, 0.36, 1) both",
+            animationDelay: "0.85s", textAlign: "center",
+          }}>
+            <p style={{
+              color: P.textSoft, fontSize: 14, fontWeight: 300, textAlign: "center",
+              maxWidth: 280, lineHeight: 1.8, margin: "0 0 4px", fontFamily: FONT_BODY,
+              opacity: 0.9,
+            }}>speak the Word</p>
+            <p style={{
+              color: P.textDim, fontSize: 11, fontWeight: 400, textAlign: "center",
+              maxWidth: 280, lineHeight: 1.6, margin: "0 0 16px", fontFamily: FONT_BODY,
+              letterSpacing: 0.3,
+            }}>And watch what grows.</p>
+          </div>
+
+          {/* Begin button — matches home screen */}
+          <div style={{
+            animation: "renewFadeInUp 1.2s cubic-bezier(0.22, 1, 0.36, 1) both",
+            animationDelay: "1.15s", display: "flex", flexDirection: "column", alignItems: "center",
+          }}>
+            <button className="renew-btn-tap" onClick={handleSplashContinue} style={{
+              ...btnMain,
+              background: "linear-gradient(135deg, #7C6AFF 0%, #6355D8 100%)",
+              boxShadow: "0 0 30px rgba(124,106,255,0.2), 0 2px 8px rgba(0,0,0,0.3)",
+              animation: "renewPulseGlow 3s ease-in-out infinite",
+              borderRadius: 10,
+            }}>Begin</button>
+          </div>
+
+          {/* Footer verse — matches home screen */}
+          <div style={{
+            position: "absolute", bottom: "max(20px, env(safe-area-inset-bottom, 20px))",
+            left: 20, right: 20, textAlign: "center",
+            animation: "renewBreathe 8s cubic-bezier(0.37, 0, 0.63, 1) infinite",
+          }}>
+            <div style={{ color: P.textGhost, fontSize: 9, fontStyle: "italic", lineHeight: 1.6, fontFamily: FONT_BODY }}>
+              "This Book of the Law shall not depart from your mouth..."
+            </div>
+            <div style={{ color: P.textGhost, fontSize: 8, marginTop: 4, fontWeight: 700, letterSpacing: 2, fontFamily: FONT }}>
+              JOSHUA 1:8
+            </div>
+          </div>
         </div>
       );
     }
 
     return (
       <div className="renew-noise" style={{
-        background: "#000", width: "100%", height: "100vh",
+        background: "#000", width: "100%", height: "100%",
         display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
         padding: "0 32px", fontFamily: FONT, position: "relative", overflow: "hidden",
+        animation: "renewLoginEnter 0.8s cubic-bezier(0.22,1,0.36,1) both",
       }}>
-        <div style={{ position: "absolute", inset: 0, pointerEvents: "none",
-          background: "radial-gradient(ellipse at 50% 40%, rgba(124,106,255,0.06) 0%, transparent 70%)",
+        {/* Breathing fog */}
+        <div style={{
+          position: "absolute", inset: 0, pointerEvents: "none",
+          background: "radial-gradient(ellipse at 50% 40%, rgba(124,106,255,0.06) 0%, transparent 65%)",
           animation: "renewFogBreathe 12s ease-in-out infinite",
         }} />
+
+        {/* Logo */}
         <div style={{
-          width: "100%", maxWidth: 380,
-          animation: "renewLoginEnter 0.8s cubic-bezier(0.22,1,0.36,1) both",
-          display: "flex", flexDirection: "column", alignItems: "center",
+          width: 44, height: 44, borderRadius: "50%",
+          background: "radial-gradient(circle, rgba(165,180,252,0.18), rgba(79,70,229,0.06) 60%, transparent 80%)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          marginBottom: 14,
+          animation: "renewLogoEntrance 1.4s cubic-bezier(0.22, 1, 0.36, 1) both",
         }}>
           <div style={{
-            width: 44, height: 44, borderRadius: "50%",
-            background: "radial-gradient(circle, rgba(165,180,252,0.18), rgba(79,70,229,0.22))",
-            display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 14,
-            boxShadow: "0 0 30px rgba(165,180,252,0.5), 0 0 60px rgba(124,106,255,0.2)",
-            animation: "renewPulseGlow 2s ease-in-out infinite",
+            width: 9, height: 9, borderRadius: "50%",
+            background: "radial-gradient(circle, #A5B4FC, #6366F1)",
+            boxShadow: "0 0 20px rgba(165,180,252,0.5), 0 0 40px rgba(124,106,255,0.15)",
+          }} />
+        </div>
+
+        <h1 style={{
+          color: "#fff", fontSize: 15, fontWeight: 700, margin: 0,
+          letterSpacing: 8, textTransform: "uppercase", fontFamily: FONT,
+          animation: "renewFadeInUp 1s cubic-bezier(0.22, 1, 0.36, 1) both",
+          animationDelay: "0.2s", marginBottom: 6,
+        }}>RENEW</h1>
+
+        <p style={{
+          color: P.textSoft, fontSize: 12, fontWeight: 300, fontFamily: FONT_BODY,
+          marginBottom: 32, textAlign: "center", lineHeight: 1.6,
+          animation: "renewFadeInUp 1s cubic-bezier(0.22, 1, 0.36, 1) both",
+          animationDelay: "0.4s",
+        }}>
+          speak the Word &middot; renew your mind
+        </p>
+
+        {/* Auth form */}
+        <div style={{
+          width: "100%", maxWidth: 320,
+          animation: "renewFadeInUp 1s cubic-bezier(0.22, 1, 0.36, 1) both",
+          animationDelay: "0.6s",
+        }}>
+          {/* Google sign-in */}
+          <button className="renew-btn-tap" onClick={handleGoogleSignIn} disabled={authBusy} style={{
+            width: "100%", padding: "14px 20px", fontSize: 13, fontWeight: 600,
+            fontFamily: FONT, letterSpacing: 0.5, cursor: "pointer",
+            background: "#fff", color: "#333", border: "none", borderRadius: 10,
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+            boxShadow: "0 2px 12px rgba(0,0,0,0.2)",
+            opacity: authBusy ? 0.6 : 1,
+            transition: "all 0.3s cubic-bezier(0.22, 1, 0.36, 1)",
           }}>
-            <div style={{ width: 9, height: 9, borderRadius: "50%",
-              background: "radial-gradient(circle, #A5B4FC, #6366F1)",
-              boxShadow: "0 0 20px rgba(165,180,252,0.5), 0 0 40px rgba(124,106,255,0.3)",
-            }} />
-          </div>
-          <h1 style={{ color: "#fff", fontSize: 15, fontWeight: 700, margin: 0, letterSpacing: 8,
-            fontFamily: FONT, textTransform: "uppercase", marginBottom: 6,
-          }}>RENEW</h1>
-          <p style={{ color: P.textSoft, fontSize: 12, fontWeight: 300, fontFamily: FONT_BODY,
-            textAlign: "center", lineHeight: 1.6, marginBottom: 36,
-          }}>speak the Word &middot; renew your mind</p>
+            <svg width="18" height="18" viewBox="0 0 24 24">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/>
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+            </svg>
+            Continue with Google
+          </button>
+
+          {/* Divider */}
           <div style={{
-            width: "100%", maxWidth: 320, background: "rgba(255,255,255,0.03)",
-            borderRadius: 16, padding: "28px 24px",
-            border: "1px solid rgba(255,255,255,0.06)",
-            backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)",
+            display: "flex", alignItems: "center", gap: 12, margin: "20px 0",
           }}>
-            <button className="renew-btn-tap" onClick={handleGoogleSignIn} disabled={authBusy} style={{
-              width: "100%", padding: "14px 20px", fontSize: 13, fontWeight: 600,
-              fontFamily: FONT, letterSpacing: 0.5, cursor: "pointer",
-              background: "#fff", color: "#333", border: "none", borderRadius: 10,
-              display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
-              boxShadow: "0 2px 12px rgba(0,0,0,0.2)",
-              opacity: authBusy ? 0.6 : 1, transition: "all 0.3s cubic-bezier(0.22,1,0.36,1)",
-            }}>
-              <svg width="18" height="18" viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/>
-                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-              </svg>
-              Continue with Google
-            </button>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "20px 0" }}>
-              <div style={{ flex: 1, height: 1, background: P.cardBorder }} />
-              <span style={{ color: P.textDim, fontSize: 10, fontFamily: FONT, letterSpacing: 1 }}>OR</span>
-              <div style={{ flex: 1, height: 1, background: P.cardBorder }} />
-            </div>
-            <input className="renew-input" value={authEmail} onChange={e => setAuthEmail(e.target.value)}
-              placeholder="Email address" type="email" style={{
-                width: "100%", boxSizing: "border-box", marginBottom: 10,
-                background: P.surface, border: `1px solid ${P.cardBorder}`,
-                borderRadius: 10, padding: "13px 16px", color: P.text, fontSize: 13,
-                fontFamily: FONT_BODY, outline: "none", transition: "border-color 0.3s, box-shadow 0.3s",
-              }} onKeyDown={e => e.key === "Enter" && handleEmailAuth()} />
-            <input className="renew-input" value={authPassword} onChange={e => setAuthPassword(e.target.value)}
-              placeholder="Password" type="password" style={{
-                width: "100%", boxSizing: "border-box", marginBottom: 14,
-                background: P.surface, border: `1px solid ${P.cardBorder}`,
-                borderRadius: 10, padding: "13px 16px", color: P.text, fontSize: 13,
-                fontFamily: FONT_BODY, outline: "none", transition: "border-color 0.3s, box-shadow 0.3s",
-              }} onKeyDown={e => e.key === "Enter" && handleEmailAuth()} />
-            {authError && (<div style={{
+            <div style={{ flex: 1, height: 1, background: P.cardBorder }} />
+            <span style={{ color: P.textDim, fontSize: 10, fontFamily: FONT, letterSpacing: 1 }}>OR</span>
+            <div style={{ flex: 1, height: 1, background: P.cardBorder }} />
+          </div>
+
+          {/* Email / Password */}
+          <input className="renew-input" value={authEmail} onChange={e => setAuthEmail(e.target.value)}
+            placeholder="Email address" type="email"
+            style={{
+              width: "100%", boxSizing: "border-box", marginBottom: 10,
+              background: P.surface, border: `1px solid ${P.cardBorder}`,
+              borderRadius: 10, padding: "13px 16px", color: P.text, fontSize: 13,
+              fontFamily: FONT_BODY, outline: "none",
+              transition: "border-color 0.3s, box-shadow 0.3s",
+            }}
+            onKeyDown={e => e.key === "Enter" && handleEmailAuth()}
+          />
+          <input className="renew-input" value={authPassword} onChange={e => setAuthPassword(e.target.value)}
+            placeholder="Password" type="password"
+            style={{
+              width: "100%", boxSizing: "border-box", marginBottom: 14,
+              background: P.surface, border: `1px solid ${P.cardBorder}`,
+              borderRadius: 10, padding: "13px 16px", color: P.text, fontSize: 13,
+              fontFamily: FONT_BODY, outline: "none",
+              transition: "border-color 0.3s, box-shadow 0.3s",
+            }}
+            onKeyDown={e => e.key === "Enter" && handleEmailAuth()}
+          />
+
+          {authError && (
+            <div style={{
               color: P.danger, fontSize: 11, fontFamily: FONT_BODY, marginBottom: 12,
               textAlign: "center", lineHeight: 1.5,
-            }}>{authError}</div>)}
-            <button className="renew-btn-tap" onClick={handleEmailAuth} disabled={authBusy || !authEmail || !authPassword} style={{
-              width: "100%", background: "linear-gradient(135deg, #7C6AFF 0%, #6355D8 100%)",
-              color: "#fff", border: "none", borderRadius: 10,
-              padding: "14px 36px", fontSize: 13, fontWeight: 600, cursor: "pointer",
-              fontFamily: FONT, letterSpacing: 1, textTransform: "uppercase",
-              boxShadow: "0 0 30px rgba(124,106,255,0.15), 0 2px 8px rgba(0,0,0,0.3)",
-              opacity: (authBusy || !authEmail || !authPassword) ? 0.5 : 1,
-              transition: "all 0.4s cubic-bezier(0.22,1,0.36,1)",
-            }}>
-              {authBusy ? "..." : authScreen === "signup" ? "Create Account" : "Sign In"}
-            </button>
-          </div>
+            }}>{authError}</div>
+          )}
+
+          <button className="renew-btn-tap" onClick={handleEmailAuth} disabled={authBusy || !authEmail || !authPassword} style={{
+            background: "linear-gradient(135deg, #7C6AFF 0%, #6355D8 100%)",
+            color: "#fff", border: "none", borderRadius: 10,
+            padding: "14px 36px", fontSize: 13, fontWeight: 600, cursor: "pointer",
+            fontFamily: FONT, letterSpacing: 1, textTransform: "uppercase",
+            boxShadow: "0 0 30px rgba(124,106,255,0.15), 0 2px 8px rgba(0,0,0,0.3)",
+            width: "100%", textAlign: "center",
+            opacity: (authBusy || !authEmail || !authPassword) ? 0.5 : 1,
+            transition: "all 0.4s cubic-bezier(0.22, 1, 0.36, 1)",
+          }}>
+            {authBusy ? "..." : authScreen === "signup" ? "Create Account" : "Sign In"}
+          </button>
+
           <button onClick={() => { setAuthScreen(authScreen === "login" ? "signup" : "login"); setAuthError(""); }} style={{
-            background: "none", border: "none", color: P.accent, fontSize: 12,
-            cursor: "pointer", fontFamily: FONT_BODY, marginTop: 20, letterSpacing: 0.3, padding: 8,
+            background: "none", border: "none", color: P.accent, fontSize: 11,
+            cursor: "pointer", fontFamily: FONT_BODY, marginTop: 16,
+            letterSpacing: 0.3, width: "100%", textAlign: "center",
           }}>
             {authScreen === "login" ? "Don't have an account? Sign up" : "Already have an account? Sign in"}
           </button>
         </div>
+
+        {/* Footer */}
         <div style={{
           position: "absolute", bottom: "max(20px, env(safe-area-inset-bottom, 20px))",
           left: 20, right: 20, textAlign: "center",
-          animation: "renewBreathe 8s cubic-bezier(0.37,0,0.63,1) infinite",
+          animation: "renewBreathe 8s cubic-bezier(0.37, 0, 0.63, 1) infinite",
         }}>
-          <div style={{ color: P.textGhost, fontSize: 9, fontStyle: "italic", lineHeight: 1.6 }}>
+          <div style={{ color: P.textGhost, fontSize: 9, fontStyle: "italic", lineHeight: 1.6, fontFamily: FONT_BODY }}>
             "This Book of the Law shall not depart from your mouth..."
           </div>
-          <div style={{ color: P.textGhost, fontSize: 8, marginTop: 4, fontWeight: 700 }}>JOSHUA 1:8</div>
+          <div style={{ color: P.textGhost, fontSize: 8, marginTop: 4, fontWeight: 700, letterSpacing: 2, fontFamily: FONT }}>
+            JOSHUA 1:8
+          </div>
         </div>
       </div>
     );
