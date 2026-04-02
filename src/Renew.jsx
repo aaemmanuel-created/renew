@@ -4,15 +4,93 @@ import * as Tone from "tone";
 // ─── Neural Network Simulation ───
 // Joshua 1:8 — "This Book of the Law shall not depart from your mouth..."
 
-// ─── Load JetBrains Mono ───
+// ─── Load JetBrains Mono + Inter ───
 const fontLink = document.createElement("link");
-fontLink.href = "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@200;300;400;500;600;700;800&display=swap";
+fontLink.href = "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@200;300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap";
 fontLink.rel = "stylesheet";
 if (!document.head.querySelector('link[href*="JetBrains+Mono"]')) {
   document.head.appendChild(fontLink);
 }
 
 const FONT = "'JetBrains Mono', monospace";
+const FONT_BODY = "'Inter', -apple-system, sans-serif"; // For scripture text & body copy
+
+// ─── Inject CSS Keyframe Animations ───
+const STYLE_ID = "renew-keyframes";
+if (!document.getElementById(STYLE_ID)) {
+  const styleEl = document.createElement("style");
+  styleEl.id = STYLE_ID;
+  styleEl.textContent = `
+    @keyframes renewFadeInUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes renewFadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    @keyframes renewBreathe {
+      0%, 100% { opacity: 0.3; }
+      50% { opacity: 0.6; }
+    }
+    @keyframes renewPulseGlow {
+      0%, 100% { box-shadow: 0 0 20px rgba(124, 106, 255, 0.15), 0 0 40px rgba(124, 106, 255, 0.05); }
+      50% { box-shadow: 0 0 25px rgba(124, 106, 255, 0.25), 0 0 50px rgba(124, 106, 255, 0.1); }
+    }
+    @keyframes renewStatusPulse {
+      0%, 100% { opacity: 0.7; }
+      50% { opacity: 1; }
+    }
+    @keyframes renewStaggerIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes renewShimmer {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
+    @keyframes renewStreakFlicker {
+      0%, 100% { opacity: 0.7; text-shadow: 0 0 4px rgba(251,146,60,0.3); }
+      25% { opacity: 0.9; text-shadow: 0 0 8px rgba(251,146,60,0.5); }
+      50% { opacity: 1; text-shadow: 0 0 12px rgba(251,146,60,0.6); }
+      75% { opacity: 0.85; text-shadow: 0 0 6px rgba(251,146,60,0.4); }
+    }
+    @keyframes renewLogoEntrance {
+      0% { opacity: 0; transform: scale(0.8) translateY(10px); }
+      100% { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    @keyframes renewDividerGrow {
+      from { width: 0; opacity: 0; }
+      to { width: 32px; opacity: 1; }
+    }
+    @keyframes renewCountUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    /* Noise texture overlay */
+    .renew-noise::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      opacity: 0.025;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+      background-repeat: repeat;
+      background-size: 256px 256px;
+      pointer-events: none;
+      z-index: 1;
+    }
+    /* Button tap feedback */
+    .renew-btn-tap { transition: transform 0.1s ease-out, box-shadow 0.2s ease; }
+    .renew-btn-tap:active { transform: scale(0.97) !important; }
+    /* Smooth scrolling for passage lists */
+    .renew-smooth-scroll { scroll-behavior: smooth; -webkit-overflow-scrolling: touch; }
+    /* Screen transitions */
+    .renew-screen-enter {
+      animation: renewFadeInUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+  `;
+  document.head.appendChild(styleEl);
+}
 
 // ─── Palette: pure black + cool accents ───
 const P = {
@@ -146,6 +224,13 @@ const SCRIPTURE_CATEGORIES = [
       { ref: "Romans 12:1", text: "I appeal to you therefore, brothers, by the mercies of God, to present your bodies as a living sacrifice, holy and acceptable to God, which is your spiritual worship." },
       // Spirit, Soul & Body
       { ref: "1 Thessalonians 5:23", text: "Now may the God of peace himself sanctify you completely, and may your whole spirit and soul and body be kept blameless at the coming of our Lord Jesus Christ." },
+      // Praise & Worship
+      { ref: "Psalm 146:1-2", text: "Praise the Lord! Praise the Lord, O my soul! I will praise the Lord as long as I live; I will sing praises to my God while I have my being." },
+      // Peace & Mind
+      { ref: "Isaiah 26:3", text: "You keep him in perfect peace whose mind is stayed on you, because he trusts in you." },
+      { ref: "Isaiah 26:7", text: "The path of the righteous is level; you make level the way of the righteous." },
+      // Character & Conduct
+      { ref: "James 1:19-21", text: "Know this, my beloved brothers: let every person be quick to hear, slow to speak, slow to anger; for the anger of man does not produce the righteousness of God. Therefore put away all filthiness and rampant wickedness and receive with meekness the implanted word, which is able to save your souls." },
     ]
   },
   {
@@ -545,15 +630,28 @@ export default function Renew() {
     const c = canvasRef.current;
     if (!c) return;
     if (screen === "home") {
-      // Home screen: no network in background — just the void
-      stateRef.current = { neurons: [], synapses: [], nextId: 0, totalSpeakTime: 0, sessionFires: 0 };
-      const ctx2 = c.getContext("2d");
-      if (ctx2) { ctx2.fillStyle = "#000000"; ctx2.fillRect(0, 0, c.width, c.height); }
-    } else if (screen === "summary" || screen === "history") {
+      // Home screen: show faint ambient network if passages have been spoken
       const combined = buildCombinedState(c.width, c.height);
-      stateRef.current = combined;
-      setNeuronCount(combined.neurons.length);
-      setSynapseCount(combined.synapses.length);
+      if (combined.neurons.length > 1) {
+        // Dim the network for ambient background effect
+        combined.neurons.forEach(n => { n.energy = Math.max(0.08, n.energy * 0.3); n.fireLevel = 0; });
+        stateRef.current = combined;
+      } else {
+        stateRef.current = { neurons: [], synapses: [], nextId: 0, totalSpeakTime: 0, sessionFires: 0 };
+        const ctx2 = c.getContext("2d");
+        if (ctx2) { ctx2.fillStyle = "#000000"; ctx2.fillRect(0, 0, c.width, c.height); }
+      }
+    } else if (screen === "summary" || screen === "history" || screen === "pick-category" || screen === "pick-passage" || screen === "custom") {
+      const combined = buildCombinedState(c.width, c.height);
+      if (combined.neurons.length > 0) {
+        // Dim neurons slightly for background ambient effect
+        if (screen !== "summary") {
+          combined.neurons.forEach(n => { n.energy = Math.max(0.08, n.energy * 0.35); n.fireLevel = 0; });
+        }
+        stateRef.current = combined;
+        setNeuronCount(combined.neurons.length);
+        setSynapseCount(combined.synapses.length);
+      }
     }
   }, [screen, buildCombinedState]);
 
@@ -1141,49 +1239,51 @@ export default function Renew() {
   const card = {
     background: P.card,
     border: `1px solid ${P.cardBorder}`,
-    borderRadius: 12,
+    borderRadius: 14,
     padding: 18,
     fontFamily: FONT,
+    transition: "border-color 0.3s ease, background 0.3s ease, box-shadow 0.3s ease",
   };
 
   const btnMain = {
-    background: P.accent,
+    background: "linear-gradient(135deg, #7C6AFF 0%, #6355D8 100%)",
     color: P.white,
     border: "none",
-    borderRadius: 8,
+    borderRadius: 10,
     padding: "14px 36px",
     fontSize: 13,
     fontWeight: 600,
     cursor: "pointer",
     fontFamily: FONT,
-    letterSpacing: 0.8,
+    letterSpacing: 1,
     textTransform: "uppercase",
-    transition: "all 0.2s",
-    boxShadow: `0 0 30px ${P.accentGlow}`,
+    transition: "all 0.25s ease",
+    boxShadow: `0 0 30px ${P.accentGlow}, 0 2px 8px rgba(0,0,0,0.3)`,
   };
 
   const btnGhost = {
     background: "transparent",
     color: P.textSoft,
     border: `1px solid ${P.cardBorder}`,
-    borderRadius: 8,
+    borderRadius: 10,
     padding: "10px 22px",
     fontSize: 11,
     cursor: "pointer",
     fontFamily: FONT,
     fontWeight: 500,
-    letterSpacing: 0.5,
+    letterSpacing: 0.8,
     textTransform: "uppercase",
+    transition: "all 0.25s ease",
   };
 
   const backBtn = {
     background: "none", border: "none", color: P.textSoft, fontSize: 12,
     cursor: "pointer", fontFamily: FONT, padding: "4px 0", marginBottom: 16,
-    letterSpacing: 0.5, fontWeight: 500,
+    letterSpacing: 0.8, fontWeight: 500, transition: "color 0.2s",
   };
 
   const labelStyle = {
-    color: P.textDim, fontSize: 9, fontWeight: 600, letterSpacing: 1.5,
+    color: P.textDim, fontSize: 9, fontWeight: 600, letterSpacing: 2,
     textTransform: "uppercase", fontFamily: FONT, marginBottom: 4,
   };
 
@@ -1202,7 +1302,7 @@ export default function Renew() {
     <div style={{
       position: "absolute", inset: 0, zIndex: 20,
       display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-      background: "radial-gradient(ellipse at 50% 40%, rgba(124,106,255,0.04) 0%, #000 70%)",
+      background: "radial-gradient(ellipse at 50% 40%, rgba(124,106,255,0.06) 0%, rgba(79,70,229,0.02) 40%, #000 70%)",
       padding: "0 28px",
       paddingTop: "max(60px, env(safe-area-inset-top, 60px))",
       paddingBottom: "max(60px, calc(60px + env(safe-area-inset-bottom, 0px)))",
@@ -1211,70 +1311,86 @@ export default function Renew() {
       fontFamily: FONT,
     }}>
 
-      {/* Logo mark */}
+      {/* Logo mark — with entrance animation */}
       <div style={{
-        width: 36, height: 36, borderRadius: "50%",
-        background: "radial-gradient(circle, rgba(165,180,252,0.2), transparent 70%)",
+        width: 44, height: 44, borderRadius: "50%",
+        background: "radial-gradient(circle, rgba(165,180,252,0.18), rgba(79,70,229,0.06) 60%, transparent 80%)",
         display: "flex", alignItems: "center", justifyContent: "center",
-        marginBottom: 10,
+        marginBottom: 12,
+        animation: "renewLogoEntrance 0.8s cubic-bezier(0.16, 1, 0.3, 1) both",
+        animationDelay: "0.1s",
       }}>
         <div style={{
-          width: 8, height: 8, borderRadius: "50%",
-          background: "radial-gradient(circle, #A5B4FC, #4F46E5)",
-          boxShadow: "0 0 16px rgba(165,180,252,0.4)",
+          width: 9, height: 9, borderRadius: "50%",
+          background: "radial-gradient(circle, #A5B4FC, #6366F1)",
+          boxShadow: "0 0 20px rgba(165,180,252,0.5), 0 0 40px rgba(124,106,255,0.15)",
+          animation: "renewPulseGlow 4s ease-in-out infinite",
         }} />
       </div>
 
       <h1 style={{
-        color: P.white, fontSize: 14, fontWeight: 700, margin: 0,
-        letterSpacing: 6, textTransform: "uppercase", fontFamily: FONT,
+        color: P.white, fontSize: 15, fontWeight: 700, margin: 0,
+        letterSpacing: 8, textTransform: "uppercase", fontFamily: FONT,
+        animation: "renewFadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both",
+        animationDelay: "0.25s",
       }}>
         RENEW
       </h1>
 
       <div style={{
-        width: 32, height: 1, background: P.cardBorder, margin: "8px 0",
+        height: 1, background: `linear-gradient(90deg, transparent, ${P.cardBorder}, transparent)`,
+        margin: "10px 0",
+        animation: "renewDividerGrow 0.8s cubic-bezier(0.16, 1, 0.3, 1) both",
+        animationDelay: "0.4s",
       }} />
 
       {isFirstTime ? (
-        <>
+        <div style={{
+          animation: "renewFadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both",
+          animationDelay: "0.5s", textAlign: "center",
+        }}>
           <p style={{
-            color: P.textSoft, fontSize: 13, fontWeight: 300, textAlign: "center",
-            maxWidth: 280, lineHeight: 1.8, margin: "0 0 4px", fontFamily: FONT,
+            color: P.textSoft, fontSize: 14, fontWeight: 300, textAlign: "center",
+            maxWidth: 280, lineHeight: 1.8, margin: "0 0 4px", fontFamily: FONT_BODY,
             opacity: 0.9,
           }}>
             speak the Word
           </p>
           <p style={{
-            color: P.textDim, fontSize: 11, fontWeight: 300, textAlign: "center",
-            maxWidth: 280, lineHeight: 1.6, margin: "0 0 14px", fontFamily: FONT,
+            color: P.textDim, fontSize: 11, fontWeight: 400, textAlign: "center",
+            maxWidth: 280, lineHeight: 1.6, margin: "0 0 16px", fontFamily: FONT_BODY,
+            letterSpacing: 0.3,
           }}>
             And watch what grows.
           </p>
-        </>
+        </div>
       ) : (
-        <>
+        <div style={{
+          animation: "renewFadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both",
+          animationDelay: "0.5s", textAlign: "center",
+        }}>
           <p style={{
-            color: P.textSoft, fontSize: 12, fontWeight: 300, textAlign: "center",
-            maxWidth: 300, lineHeight: 1.6, margin: "0 0 4px", fontFamily: FONT,
+            color: P.textSoft, fontSize: 13, fontWeight: 300, textAlign: "center",
+            maxWidth: 300, lineHeight: 1.6, margin: "0 0 4px", fontFamily: FONT_BODY,
           }}>
             Your mind is being renewed.
           </p>
           <p style={{
             color: P.textDim, fontSize: 10, fontWeight: 400, textAlign: "center",
-            maxWidth: 300, lineHeight: 1.5, margin: "0 0 14px", fontFamily: FONT,
+            maxWidth: 300, lineHeight: 1.5, margin: "0 0 16px", fontFamily: FONT_BODY,
           }}>
             {lifetimeNeurons} neurons formed across {sessionHistory.length} session{sessionHistory.length !== 1 ? "s" : ""}.
           </p>
-        </>
+        </div>
       )}
 
-      {/* Streak — top right corner */}
+      {/* Streak — top right corner with flicker animation */}
       {currentStreak > 0 && (
         <div style={{
           position: "absolute", top: "max(20px, env(safe-area-inset-top, 20px))", right: "max(22px, env(safe-area-inset-right, 22px))",
           display: "flex", alignItems: "center", gap: 5,
-          cursor: "pointer", opacity: 0.7,
+          cursor: "pointer",
+          animation: "renewStreakFlicker 3s ease-in-out infinite",
         }} onClick={() => setScreen("history")}>
           <span style={{ color: P.streak, fontSize: 18, fontWeight: 800, fontFamily: FONT, lineHeight: 1 }}>
             {currentStreak}
@@ -1283,21 +1399,36 @@ export default function Renew() {
         </div>
       )}
 
-      <button onClick={() => setScreen("pick-category")} style={btnMain}>
-        {isFirstTime ? "Begin" : "Choose Scripture"}
-      </button>
-
-      {!isFirstTime && (
-        <button onClick={() => setScreen("history")} style={{
-          ...btnGhost, marginTop: 12, border: "none", color: P.accent, fontSize: 10,
+      <div style={{
+        animation: "renewFadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both",
+        animationDelay: "0.65s", display: "flex", flexDirection: "column", alignItems: "center",
+      }}>
+        <button className="renew-btn-tap" onClick={() => setScreen("pick-category")} style={{
+          ...btnMain,
+          background: "linear-gradient(135deg, #7C6AFF 0%, #6355D8 100%)",
+          boxShadow: "0 0 30px rgba(124,106,255,0.2), 0 2px 8px rgba(0,0,0,0.3)",
+          animation: "renewPulseGlow 3s ease-in-out infinite",
+          borderRadius: 10,
         }}>
-          View History
+          {isFirstTime ? "Begin" : "Choose Scripture"}
         </button>
-      )}
 
-      {/* Footer verse */}
-      <div style={{ position: "absolute", bottom: "max(24px, env(safe-area-inset-bottom, 24px))", left: 20, right: 20, textAlign: "center" }}>
-        <div style={{ color: P.textGhost, fontSize: 9, fontStyle: "italic", lineHeight: 1.6, fontFamily: FONT }}>
+        {!isFirstTime && (
+          <button className="renew-btn-tap" onClick={() => setScreen("history")} style={{
+            ...btnGhost, marginTop: 14, border: "none", color: P.accent, fontSize: 10,
+            letterSpacing: 1,
+          }}>
+            View History
+          </button>
+        )}
+      </div>
+
+      {/* Footer verse — breathing opacity animation */}
+      <div style={{
+        position: "absolute", bottom: "max(24px, env(safe-area-inset-bottom, 24px))", left: 20, right: 20, textAlign: "center",
+        animation: "renewBreathe 6s ease-in-out infinite",
+      }}>
+        <div style={{ color: P.textGhost, fontSize: 9, fontStyle: "italic", lineHeight: 1.6, fontFamily: FONT_BODY, letterSpacing: 0.3 }}>
           "This Book of the Law shall not depart from your mouth..."
         </div>
         <div style={{ color: P.textGhost, fontSize: 8, marginTop: 4, fontWeight: 700, letterSpacing: 2, fontFamily: FONT }}>
@@ -1307,79 +1438,96 @@ export default function Renew() {
     </div>
   );
 
-  const renderPickCategory = () => (
+  const renderPickCategory = () => {
+    const catColors = { PERSON: sessionPillarUI.fire, VEHICLE: getPillarColors("VEHICLE").fire, ASSIGNMENT: getPillarColors("ASSIGNMENT").fire };
+    return (
     <div style={{
       position: "absolute", inset: 0, zIndex: 20,
       display: "flex", flexDirection: "column",
-      background: P.black, padding: 24,
+      background: "rgba(0,0,0,0.88)", padding: 24,
       paddingTop: "max(24px, env(safe-area-inset-top, 24px))",
       paddingBottom: "max(24px, env(safe-area-inset-bottom, 24px))",
       paddingLeft: "max(24px, env(safe-area-inset-left, 24px))",
       paddingRight: "max(24px, env(safe-area-inset-right, 24px))",
       overflowY: "auto", fontFamily: FONT,
     }}>
-      <button onClick={() => setScreen("home")} style={backBtn}>{"\u2190  back"}</button>
+      <button className="renew-btn-tap" onClick={() => setScreen("home")} style={backBtn}>{"\u2190  back"}</button>
       <div style={labelStyle}>Choose a pillar</div>
-      <h2 style={{ color: P.white, fontSize: 18, fontWeight: 700, margin: "4px 0 20px", fontFamily: FONT, letterSpacing: 3 }}>
-        PERSON  VEHICLE  ASSIGNMENT
+      <h2 style={{ color: P.white, fontSize: 18, fontWeight: 700, margin: "4px 0 22px", fontFamily: FONT, letterSpacing: 4 }}>
+        SCRIPTURE
       </h2>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {SCRIPTURE_CATEGORIES.map((cat, i) => (
-          <button key={i} onClick={() => { setSelectedCategory(cat); setScreen("pick-passage"); }} style={{
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {SCRIPTURE_CATEGORIES.map((cat, i) => {
+          const cc = getPillarColors(cat.name).fire;
+          const accentCSS = `rgb(${cc[0]}, ${cc[1]}, ${cc[2]})`;
+          return (
+          <button className="renew-btn-tap" key={i} onClick={() => { setSelectedCategory(cat); setScreen("pick-passage"); }} style={{
             ...card, cursor: "pointer", display: "flex", alignItems: "center", gap: 14,
-            textAlign: "left", transition: "border-color 0.2s, background 0.2s",
+            textAlign: "left", position: "relative", overflow: "hidden", padding: "18px 18px 18px 22px",
+            borderLeft: `3px solid ${accentCSS}`,
+            animation: `renewStaggerIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both`,
+            animationDelay: `${i * 0.08}s`,
           }}
-          onMouseEnter={e => { e.currentTarget.style.borderColor = P.accent + "44"; e.currentTarget.style.background = P.surface; }}
-          onMouseLeave={e => { e.currentTarget.style.borderColor = P.cardBorder; e.currentTarget.style.background = P.card; }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = accentCSS; e.currentTarget.style.background = P.surface; e.currentTarget.style.boxShadow = `0 0 20px rgba(${cc[0]}, ${cc[1]}, ${cc[2]}, 0.08)`; }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = P.cardBorder; e.currentTarget.style.borderLeftColor = accentCSS; e.currentTarget.style.background = P.card; e.currentTarget.style.boxShadow = "none"; }}
           >
             <div>
-              <div style={{ color: P.text, fontSize: 13, fontWeight: 600, fontFamily: FONT, letterSpacing: 2 }}>{cat.name}</div>
-              <div style={{ color: P.textSoft, fontSize: 10, fontFamily: FONT, fontWeight: 300 }}>{cat.subtitle}</div>
-              <div style={{ color: P.textDim, fontSize: 9, fontFamily: FONT, marginTop: 2 }}>{cat.passages.length} passages</div>
+              <div style={{ color: P.text, fontSize: 13, fontWeight: 700, fontFamily: FONT, letterSpacing: 3 }}>{cat.name}</div>
+              <div style={{ color: P.textSoft, fontSize: 10, fontFamily: FONT_BODY, fontWeight: 400, marginTop: 2 }}>{cat.subtitle}</div>
+              <div style={{ color: P.textDim, fontSize: 9, fontFamily: FONT, marginTop: 4, letterSpacing: 0.5 }}>{cat.passages.length} passages</div>
             </div>
           </button>
-        ))}
+        );
+        })}
       </div>
 
-      <button onClick={() => setScreen("custom")} style={{ ...btnGhost, marginTop: 16, alignSelf: "flex-start" }}>
+      <button className="renew-btn-tap" onClick={() => setScreen("custom")} style={{ ...btnGhost, marginTop: 18, alignSelf: "flex-start" }}>
         enter your own scripture
       </button>
     </div>
   );
+  };
 
   const renderPickPassage = () => (
-    <div style={{
+    <div className="renew-smooth-scroll" style={{
       position: "absolute", inset: 0, zIndex: 20,
       display: "flex", flexDirection: "column",
-      background: P.black, padding: 24,
+      background: "rgba(0,0,0,0.88)", padding: 24,
       paddingTop: "max(24px, env(safe-area-inset-top, 24px))",
       paddingBottom: "max(24px, env(safe-area-inset-bottom, 24px))",
       paddingLeft: "max(24px, env(safe-area-inset-left, 24px))",
       paddingRight: "max(24px, env(safe-area-inset-right, 24px))",
       overflowY: "auto", fontFamily: FONT,
     }}>
-      <button onClick={() => setScreen("pick-category")} style={backBtn}>{"\u2190  back"}</button>
+      <button className="renew-btn-tap" onClick={() => setScreen("pick-category")} style={backBtn}>{"\u2190  back"}</button>
       <div style={{ marginBottom: 4 }}>
         <div style={labelStyle}>Pillar</div>
-        <h2 style={{ color: P.white, fontSize: 16, fontWeight: 700, margin: "4px 0 0", fontFamily: FONT, letterSpacing: 2 }}>{selectedCategory?.name}</h2>
+        <h2 style={{ color: P.white, fontSize: 16, fontWeight: 700, margin: "4px 0 0", fontFamily: FONT, letterSpacing: 3 }}>{selectedCategory?.name}</h2>
       </div>
-      <div style={{ color: P.textDim, fontSize: 10, margin: "4px 0 18px", fontFamily: FONT }}>
+      <div style={{ color: P.textDim, fontSize: 10, margin: "4px 0 18px", fontFamily: FONT_BODY }}>
         Tap a passage to begin speaking it aloud
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {selectedCategory?.passages.map((p, i) => {
           const saved = passageNetworksRef.current[getPassageKey(p)];
+          const hasSaved = !!saved;
           return (
-            <button key={i} onClick={() => { setSelectedPassage(p); startListening(p); }} style={{
-              ...card, cursor: "pointer", textAlign: "left", transition: "border-color 0.2s, background 0.2s",
+            <button className="renew-btn-tap" key={i} onClick={() => { setSelectedPassage(p); startListening(p); }} style={{
+              ...card, cursor: "pointer", textAlign: "left",
+              borderLeft: `3px solid ${pillarAccentCSS}`,
+              padding: "16px 16px 16px 20px",
+              background: hasSaved ? `rgba(${sessionPillarUI.fire[0]}, ${sessionPillarUI.fire[1]}, ${sessionPillarUI.fire[2]}, 0.03)` : P.card,
+              boxShadow: hasSaved ? `inset 0 0 30px rgba(${sessionPillarUI.fire[0]}, ${sessionPillarUI.fire[1]}, ${sessionPillarUI.fire[2]}, 0.04)` : "none",
+              animation: `renewStaggerIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) both`,
+              animationDelay: `${Math.min(i * 0.04, 0.6)}s`,
             }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = P.accent + "44"; e.currentTarget.style.background = P.surface; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = P.cardBorder; e.currentTarget.style.background = P.card; }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = pillarAccentCSS; e.currentTarget.style.background = P.surface; e.currentTarget.style.boxShadow = `0 0 20px rgba(${sessionPillarUI.fire[0]}, ${sessionPillarUI.fire[1]}, ${sessionPillarUI.fire[2]}, 0.08)`; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = P.cardBorder; e.currentTarget.style.borderLeftColor = pillarAccentCSS; e.currentTarget.style.background = hasSaved ? `rgba(${sessionPillarUI.fire[0]}, ${sessionPillarUI.fire[1]}, ${sessionPillarUI.fire[2]}, 0.03)` : P.card; e.currentTarget.style.boxShadow = hasSaved ? `inset 0 0 30px rgba(${sessionPillarUI.fire[0]}, ${sessionPillarUI.fire[1]}, ${sessionPillarUI.fire[2]}, 0.04)` : "none"; }}
             >
               <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 8 }}>
-                <div style={{ color: pillarAccentCSS, fontSize: 11, fontWeight: 700, fontFamily: FONT, letterSpacing: 0.5 }}>
+                <div style={{ color: pillarAccentCSS, fontSize: 11, fontWeight: 700, fontFamily: FONT, letterSpacing: 1 }}>
                   {p.ref}
                 </div>
                 {saved && (
@@ -1389,7 +1537,7 @@ export default function Renew() {
                     <div style={{
                       width: 6, height: 6, borderRadius: "50%",
                       background: pillarAccentCSS,
-                      boxShadow: `0 0 8px ${pillarAccentCSS}`,
+                      boxShadow: `0 0 10px ${pillarAccentCSS}`,
                     }} />
                     <span style={{ color: P.textDim, fontSize: 9, fontFamily: FONT }}>
                       {saved.neurons.length} neurons
@@ -1398,7 +1546,7 @@ export default function Renew() {
                 )}
               </div>
               <div style={{
-                color: P.textSoft, fontSize: 11, lineHeight: 1.7, fontFamily: FONT, fontWeight: 300,
+                color: P.textSoft, fontSize: 12, lineHeight: 1.75, fontFamily: FONT_BODY, fontWeight: 300,
                 display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden",
               }}>
                 {p.text}
@@ -1414,16 +1562,16 @@ export default function Renew() {
     <div style={{
       position: "absolute", inset: 0, zIndex: 20,
       display: "flex", flexDirection: "column",
-      background: P.black, padding: 24,
+      background: "rgba(0,0,0,0.9)", padding: 24,
       paddingTop: "max(24px, env(safe-area-inset-top, 24px))",
       paddingBottom: "max(24px, env(safe-area-inset-bottom, 24px))",
       paddingLeft: "max(24px, env(safe-area-inset-left, 24px))",
       paddingRight: "max(24px, env(safe-area-inset-right, 24px))",
       fontFamily: FONT,
     }}>
-      <button onClick={() => setScreen("home")} style={backBtn}>{"\u2190  back"}</button>
+      <button className="renew-btn-tap" onClick={() => setScreen("home")} style={backBtn}>{"\u2190  back"}</button>
       <div style={labelStyle}>Custom passage</div>
-      <h2 style={{ color: P.white, fontSize: 16, fontWeight: 700, margin: "4px 0 24px", fontFamily: FONT }}>
+      <h2 style={{ color: P.white, fontSize: 16, fontWeight: 700, margin: "4px 0 24px", fontFamily: FONT, letterSpacing: 2 }}>
         Enter your Scripture
       </h2>
 
@@ -1434,8 +1582,9 @@ export default function Renew() {
           style={{
             width: "100%", boxSizing: "border-box",
             background: P.surface, border: `1px solid ${P.cardBorder}`,
-            borderRadius: 8, padding: "12px 14px", color: P.text, fontSize: 12,
+            borderRadius: 10, padding: "13px 16px", color: P.text, fontSize: 13,
             fontFamily: FONT, outline: "none", fontWeight: 400,
+            transition: "border-color 0.25s",
           }} />
       </div>
       <div style={{ marginBottom: 28 }}>
@@ -1446,12 +1595,13 @@ export default function Renew() {
           style={{
             width: "100%", boxSizing: "border-box",
             background: P.surface, border: `1px solid ${P.cardBorder}`,
-            borderRadius: 8, padding: "12px 14px", color: P.text, fontSize: 12,
-            fontFamily: FONT, outline: "none", resize: "vertical", lineHeight: 1.8, fontWeight: 300,
+            borderRadius: 10, padding: "13px 16px", color: P.text, fontSize: 13,
+            fontFamily: FONT_BODY, outline: "none", resize: "vertical", lineHeight: 1.85, fontWeight: 300,
+            transition: "border-color 0.25s",
           }} />
       </div>
 
-      <button
+      <button className="renew-btn-tap"
         onClick={() => { const p = { ref: customRef || "Custom", text: customText }; setSelectedPassage(p); startListening(p); }}
         disabled={!customText.trim()}
         style={{ ...btnMain, alignSelf: "center", opacity: customText.trim() ? 1 : 0.3, cursor: customText.trim() ? "pointer" : "not-allowed" }}
@@ -1459,7 +1609,7 @@ export default function Renew() {
         Begin Speaking
       </button>
       {permissionDenied && (
-        <p style={{ color: P.danger, fontSize: 10, marginTop: 12, textAlign: "center", fontFamily: FONT }}>
+        <p style={{ color: P.danger, fontSize: 10, marginTop: 12, textAlign: "center", fontFamily: FONT_BODY }}>
           Microphone access required. Please allow and try again.
         </p>
       )}
@@ -1476,13 +1626,13 @@ export default function Renew() {
         paddingLeft: "max(18px, env(safe-area-inset-left, 18px))",
         paddingRight: "max(18px, env(safe-area-inset-right, 18px))",
         display: "flex", justifyContent: "space-between", alignItems: "flex-start",
-        zIndex: 10, background: "linear-gradient(180deg, rgba(0,0,0,0.9) 0%, transparent 100%)", fontFamily: FONT,
+        zIndex: 10, background: "linear-gradient(180deg, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.4) 70%, transparent 100%)", fontFamily: FONT,
       }}>
         <div>
-          <div style={{ color: P.white, fontSize: 10, fontWeight: 700, letterSpacing: 4, textTransform: "uppercase" }}>
+          <div style={{ color: P.white, fontSize: 10, fontWeight: 700, letterSpacing: 5, textTransform: "uppercase" }}>
             RENEW
           </div>
-          <div style={{ color: P.textDim, fontSize: 8, marginTop: 2, letterSpacing: 1, fontWeight: 500 }}>
+          <div style={{ color: P.textDim, fontSize: 8, marginTop: 3, letterSpacing: 1.2, fontWeight: 500, fontFamily: FONT_BODY }}>
             speak the Word &middot; renew your mind
           </div>
         </div>
@@ -1500,21 +1650,23 @@ export default function Renew() {
         </div>
       </div>
 
-      {/* Scripture card */}
+      {/* Scripture card — glassmorphism */}
       {selectedPassage && (
         <div style={{ position: "absolute", top: "calc(56px + env(safe-area-inset-top, 0px))", left: 14, right: 14, zIndex: 10 }}>
           <div style={{
-            ...card, padding: "14px 16px",
-            background: isSpeaking ? "rgba(10,10,10,0.85)" : "rgba(10,10,10,0.5)",
-            borderColor: isSpeaking ? P.accent + "33" : P.cardBorder,
+            ...card, padding: "14px 18px",
+            background: isSpeaking ? "rgba(10,10,10,0.75)" : "rgba(10,10,10,0.45)",
+            backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)",
+            borderColor: isSpeaking ? `rgba(${sessionPillarUI.fire[0]}, ${sessionPillarUI.fire[1]}, ${sessionPillarUI.fire[2]}, 0.25)` : "rgba(255,255,255,0.06)",
             transition: "all 0.5s", maxHeight: 130, overflowY: "auto",
+            boxShadow: isSpeaking ? `0 0 30px rgba(${sessionPillarUI.fire[0]}, ${sessionPillarUI.fire[1]}, ${sessionPillarUI.fire[2]}, 0.06)` : "none",
           }}>
-            <div style={{ color: pillarAccentCSS, fontSize: 9, fontWeight: 700, marginBottom: 8, letterSpacing: 1.5, textTransform: "uppercase", fontFamily: FONT }}>
+            <div style={{ color: pillarAccentCSS, fontSize: 9, fontWeight: 700, marginBottom: 8, letterSpacing: 2, textTransform: "uppercase", fontFamily: FONT }}>
               {selectedPassage.ref}
             </div>
             <div style={{
               color: isSpeaking ? P.text : P.textSoft,
-              fontSize: 11, lineHeight: 1.9, fontWeight: 300, fontFamily: FONT,
+              fontSize: 12, lineHeight: 1.9, fontWeight: 300, fontFamily: FONT_BODY,
               transition: "color 0.5s",
             }}>
               {selectedPassage.text}
@@ -1526,20 +1678,20 @@ export default function Renew() {
       {/* Bottom controls — Joshua 1:8 + waveform + status + end */}
       <div style={{
         position: "absolute", bottom: 0, left: 0, right: 0,
-        display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
+        display: "flex", flexDirection: "column", alignItems: "center", gap: 5,
         zIndex: 10, fontFamily: FONT,
         paddingBottom: "max(40px, calc(40px + env(safe-area-inset-bottom, 0px)))",
         paddingLeft: "env(safe-area-inset-left, 0px)",
         paddingRight: "env(safe-area-inset-right, 0px)",
         paddingTop: 14,
-        background: "linear-gradient(0deg, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.6) 60%, transparent 100%)",
+        background: "linear-gradient(0deg, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.6) 60%, transparent 100%)",
       }}>
-        {/* Joshua 1:8 — compact */}
-        <div style={{ textAlign: "center", padding: "0 20px", marginBottom: 2 }}>
+        {/* Joshua 1:8 — compact with breathing */}
+        <div style={{ textAlign: "center", padding: "0 20px", marginBottom: 3 }}>
           <div style={{
             color: isSpeaking ? P.textDim : P.textGhost,
             fontSize: 8, fontStyle: "italic", lineHeight: 1.5, transition: "color 0.5s",
-            fontWeight: 300, fontFamily: FONT,
+            fontWeight: 300, fontFamily: FONT_BODY,
           }}>
             "This Book of the Law shall not depart from your mouth..."
           </div>
@@ -1552,31 +1704,32 @@ export default function Renew() {
           </div>
         </div>
 
-        {/* Live waveform visualizer */}
+        {/* Live waveform visualizer — organic with varied widths and glow */}
         <div style={{
-          display: "flex", alignItems: "center", gap: 2.5, height: 28,
+          display: "flex", alignItems: "center", gap: 2, height: 32,
           padding: "0 12px",
         }}>
-          {Array.from({length: 16}, (_, i) => {
-            const center = 7.5;
+          {Array.from({length: 20}, (_, i) => {
+            const center = 9.5;
             const dist = Math.abs(i - center) / center;
-            const wave = 1 - dist * 0.7;
-            const phase = Date.now() * 0.004 + i * 0.6;
+            const wave = 1 - dist * 0.65;
+            const phase = Date.now() * 0.004 + i * 0.5;
             const ripple = Math.sin(phase) * 0.3 + 0.7;
             const h = isSpeaking
-              ? 4 + volume * 55 * wave * ripple
-              : 2 + Math.sin(Date.now() * 0.002 + i * 0.4) * 1;
+              ? 4 + volume * 60 * wave * ripple
+              : 2 + Math.sin(Date.now() * 0.002 + i * 0.4) * 1.2;
+            const barWidth = 1.8 + Math.sin(i * 0.7) * 0.6; // varied widths
             return (
               <div key={i} style={{
-                width: 2.5, borderRadius: 2,
+                width: barWidth, borderRadius: 3,
                 background: isSpeaking
                   ? `rgba(${sessionPillarUI.fire[0]}, ${sessionPillarUI.fire[1]}, ${sessionPillarUI.fire[2]}, ${0.5 + volume * 0.5})`
                   : P.textDim,
                 height: `${h}px`,
-                transition: "height 0.08s ease-out, background 0.3s",
-                opacity: isSpeaking ? 0.6 + volume * 0.4 : 0.2,
-                boxShadow: isSpeaking && volume > 0.1
-                  ? `0 0 ${4 + volume * 8}px rgba(${sessionPillarUI.fire[0]}, ${sessionPillarUI.fire[1]}, ${sessionPillarUI.fire[2]}, ${volume * 0.3})`
+                transition: "height 0.06s ease-out, background 0.3s",
+                opacity: isSpeaking ? 0.65 + volume * 0.35 : 0.2,
+                boxShadow: isSpeaking && volume > 0.08
+                  ? `0 0 ${5 + volume * 10}px rgba(${sessionPillarUI.fire[0]}, ${sessionPillarUI.fire[1]}, ${sessionPillarUI.fire[2]}, ${volume * 0.35})`
                   : "none",
               }} />
             );
@@ -1584,33 +1737,36 @@ export default function Renew() {
         </div>
 
         <span style={{
-          fontSize: 9, color: isSpeaking ? P.fire : P.textDim,
-          fontWeight: 500, letterSpacing: 1.5, fontFamily: FONT,
+          fontSize: 9, color: isSpeaking ? pillarAccentCSS : P.textDim,
+          fontWeight: 600, letterSpacing: 2, fontFamily: FONT,
           textTransform: "uppercase", transition: "color 0.3s",
+          animation: isSpeaking ? "renewStatusPulse 2s ease-in-out infinite" : "none",
         }}>
           {isSpeaking ? "speaking" : "listening"}
         </span>
 
         {/* End button — large touch target for mobile */}
-        <button onClick={endSession} style={{
+        <button className="renew-btn-tap" onClick={endSession} style={{
           ...btnGhost,
-          marginTop: 2,
+          marginTop: 4,
           padding: "12px 40px",
           fontSize: 11,
           letterSpacing: 2,
-          borderColor: P.textGhost,
+          borderColor: "rgba(255,255,255,0.08)",
           color: P.textSoft,
           borderRadius: 24,
           minHeight: 44,
           WebkitTapHighlightColor: "transparent",
+          backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)",
         }}>END</button>
       </div>
 
+      {/* Speaking vignette pulse — syncs with volume */}
       {isSpeaking && (
         <div style={{
           position: "absolute", inset: 0, pointerEvents: "none", zIndex: 5,
-          boxShadow: `inset 0 0 ${50 + volume * 80}px rgba(${sessionPillarUI.fire[0]}, ${sessionPillarUI.fire[1]}, ${sessionPillarUI.fire[2]}, ${volume * 0.1})`,
-          transition: "box-shadow 0.2s",
+          boxShadow: `inset 0 0 ${60 + volume * 100}px rgba(${sessionPillarUI.fire[0]}, ${sessionPillarUI.fire[1]}, ${sessionPillarUI.fire[2]}, ${0.02 + volume * 0.12})`,
+          transition: "box-shadow 0.15s ease-out",
         }} />
       )}
     </>
@@ -1619,11 +1775,17 @@ export default function Renew() {
   const renderSummary = () => {
     const last = sessionHistory[sessionHistory.length - 1];
     const grew = lastGrowthRef.current || { neurons: 0, synapses: 0, dendrites: 0, speakTime: 0 };
+    const growthItems = [
+      grew.neurons > 0 && { label: "New neurons formed", value: `+${grew.neurons}`, color: P.neuronCore },
+      grew.dendrites > 0 && { label: "Neurites sprouted", value: `+${grew.dendrites}`, color: P.fire },
+      grew.synapses > 0 && { label: "Connections formed", value: `+${grew.synapses}`, color: P.accent },
+    ].filter(Boolean);
+
     return (
       <div style={{
         position: "absolute", inset: 0, zIndex: 20,
         display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-        background: "radial-gradient(ellipse at 50% 40%, rgba(192,132,252,0.04) 0%, #000 70%)",
+        background: "radial-gradient(ellipse at 50% 40%, rgba(192,132,252,0.06) 0%, rgba(79,70,229,0.02) 40%, #000 70%)",
         padding: 28,
         paddingTop: "max(28px, env(safe-area-inset-top, 28px))",
         paddingBottom: "max(28px, env(safe-area-inset-bottom, 28px))",
@@ -1631,44 +1793,50 @@ export default function Renew() {
         paddingRight: "max(28px, env(safe-area-inset-right, 28px))",
         fontFamily: FONT,
       }}>
-        <div style={labelStyle}>Session complete</div>
-        <h2 style={{ color: P.white, fontSize: 20, fontWeight: 300, margin: "6px 0 4px", letterSpacing: 1, fontFamily: FONT }}>
-          Well done.
-        </h2>
-        <div style={{ color: pillarAccentCSS, fontSize: 11, fontWeight: 600, letterSpacing: 0.5, fontFamily: FONT, marginBottom: 24 }}>
-          {last?.ref}
+        <div style={{
+          animation: "renewFadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) both",
+          animationDelay: "0.1s", textAlign: "center",
+        }}>
+          <div style={labelStyle}>Session complete</div>
+          <h2 style={{ color: P.white, fontSize: 22, fontWeight: 300, margin: "6px 0 4px", letterSpacing: 1.5, fontFamily: FONT_BODY }}>
+            Well done.
+          </h2>
+          <div style={{ color: pillarAccentCSS, fontSize: 11, fontWeight: 600, letterSpacing: 1, fontFamily: FONT, marginBottom: 24 }}>
+            {last?.ref}
+          </div>
         </div>
 
         {/* Time spoken this session */}
-        <div style={{ color: P.white, fontSize: 28, fontWeight: 200, fontFamily: FONT, letterSpacing: 2, marginBottom: 4 }}>
-          {fmtTime(grew.speakTime)}
+        <div style={{
+          animation: "renewCountUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both",
+          animationDelay: "0.3s", textAlign: "center",
+        }}>
+          <div style={{ color: P.white, fontSize: 30, fontWeight: 200, fontFamily: FONT, letterSpacing: 3, marginBottom: 4 }}>
+            {fmtTime(grew.speakTime)}
+          </div>
+          <div style={{ ...labelStyle, marginBottom: 24, color: P.textDim }}>spoken this session</div>
         </div>
-        <div style={{ ...labelStyle, marginBottom: 24, color: P.textDim }}>spoken this session</div>
 
-        {/* Growth this session — what sprouted */}
-        <div style={{ ...card, padding: "16px 20px", marginBottom: 20, width: "100%", maxWidth: 300 }}>
+        {/* Growth this session — staggered reveal */}
+        <div style={{
+          ...card, padding: "16px 20px", marginBottom: 20, width: "100%", maxWidth: 300,
+          animation: "renewFadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) both",
+          animationDelay: "0.5s",
+        }}>
           <div style={{ ...labelStyle, marginBottom: 12 }}>This session</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {grew.neurons > 0 && (
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ color: P.textSoft, fontSize: 11, fontFamily: FONT }}>New neurons formed</span>
-                <span style={{ color: P.neuronCore, fontSize: 14, fontWeight: 700, fontFamily: FONT }}>+{grew.neurons}</span>
+            {growthItems.map((item, idx) => (
+              <div key={idx} style={{
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                animation: "renewStaggerIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both",
+                animationDelay: `${0.7 + idx * 0.12}s`,
+              }}>
+                <span style={{ color: P.textSoft, fontSize: 11, fontFamily: FONT_BODY }}>{item.label}</span>
+                <span style={{ color: item.color, fontSize: 14, fontWeight: 700, fontFamily: FONT }}>{item.value}</span>
               </div>
-            )}
-            {grew.dendrites > 0 && (
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ color: P.textSoft, fontSize: 11, fontFamily: FONT }}>Neurites sprouted</span>
-                <span style={{ color: P.fire, fontSize: 14, fontWeight: 700, fontFamily: FONT }}>+{grew.dendrites}</span>
-              </div>
-            )}
-            {grew.synapses > 0 && (
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ color: P.textSoft, fontSize: 11, fontFamily: FONT }}>Connections formed</span>
-                <span style={{ color: P.accent, fontSize: 14, fontWeight: 700, fontFamily: FONT }}>+{grew.synapses}</span>
-              </div>
-            )}
-            {grew.neurons === 0 && grew.dendrites === 0 && grew.synapses === 0 && (
-              <div style={{ color: P.textDim, fontSize: 11, fontFamily: FONT, textAlign: "center" }}>
+            ))}
+            {growthItems.length === 0 && (
+              <div style={{ color: P.textDim, fontSize: 11, fontFamily: FONT_BODY, textAlign: "center" }}>
                 Your network strengthened. Growth takes time.
               </div>
             )}
@@ -1676,10 +1844,15 @@ export default function Renew() {
         </div>
 
         {/* Lifetime network */}
-        <div style={{ ...card, padding: "12px 20px", marginBottom: 24, width: "100%", maxWidth: 300, borderColor: "rgba(251,146,60,0.15)", background: P.surface }}>
+        <div style={{
+          ...card, padding: "12px 20px", marginBottom: 24, width: "100%", maxWidth: 300,
+          borderColor: "rgba(251,146,60,0.15)", background: P.surface,
+          animation: "renewFadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) both",
+          animationDelay: "0.8s",
+        }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div>
-              <div style={{ color: P.streak, fontSize: 14, fontWeight: 700, fontFamily: FONT }}>{currentStreak} day streak</div>
+              <div style={{ color: P.streak, fontSize: 14, fontWeight: 700, fontFamily: FONT, animation: "renewStreakFlicker 3s ease-in-out infinite" }}>{currentStreak} day streak</div>
               <div style={{ color: P.textDim, fontSize: 9, fontFamily: FONT }}>best: {longestStreak} days</div>
             </div>
             <div style={{ textAlign: "right" }}>
@@ -1689,41 +1862,52 @@ export default function Renew() {
           </div>
         </div>
 
-        <button onClick={() => { setSelectedPassage(null); setScreen(selectedCategory ? "pick-passage" : "home"); }} style={btnMain}>
-          Continue
-        </button>
-        <button onClick={() => { setSelectedPassage(null); setScreen("home"); }} style={{ ...btnGhost, marginTop: 12 }}>
-          Home
-        </button>
+        <div style={{
+          animation: "renewFadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) both",
+          animationDelay: "1s", display: "flex", flexDirection: "column", alignItems: "center",
+        }}>
+          <button className="renew-btn-tap" onClick={() => { setSelectedPassage(null); setScreen(selectedCategory ? "pick-passage" : "home"); }} style={btnMain}>
+            Continue
+          </button>
+          <button className="renew-btn-tap" onClick={() => { setSelectedPassage(null); setScreen("home"); }} style={{ ...btnGhost, marginTop: 12 }}>
+            Home
+          </button>
+        </div>
       </div>
     );
   };
 
   const renderHistory = () => (
-    <div style={{
+    <div className="renew-smooth-scroll" style={{
       position: "absolute", inset: 0, zIndex: 20,
       display: "flex", flexDirection: "column",
-      background: P.black, padding: 24,
+      background: "rgba(0,0,0,0.85)",
+      backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)",
+      padding: 24,
       paddingTop: "max(24px, env(safe-area-inset-top, 24px))",
       paddingBottom: "max(24px, env(safe-area-inset-bottom, 24px))",
       paddingLeft: "max(24px, env(safe-area-inset-left, 24px))",
       paddingRight: "max(24px, env(safe-area-inset-right, 24px))",
       overflowY: "auto", fontFamily: FONT,
     }}>
-      <button onClick={() => setScreen("home")} style={backBtn}>{"\u2190  back"}</button>
+      <button className="renew-btn-tap" onClick={() => setScreen("home")} style={backBtn}>{"\u2190  back"}</button>
       <div style={labelStyle}>Your journey</div>
-      <h2 style={{ color: P.white, fontSize: 18, fontWeight: 700, margin: "4px 0 20px", fontFamily: FONT }}>
+      <h2 style={{ color: P.white, fontSize: 18, fontWeight: 700, margin: "4px 0 22px", fontFamily: FONT, letterSpacing: 3 }}>
         History & Stats
       </h2>
 
-      <div style={{ display: "flex", gap: 6, marginBottom: 24 }}>
+      <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
         {[
           { label: "Total time", value: fmtShort(lifetimeSeconds), color: P.accent },
           { label: "Streak", value: `${currentStreak}d`, color: P.streak },
           { label: "Best", value: `${longestStreak}d`, color: P.fire },
           { label: "Neurons", value: lifetimeNeurons, color: P.neuronCore },
         ].map((s, i) => (
-          <div key={i} style={{ ...card, padding: "12px 6px", flex: 1, textAlign: "center" }}>
+          <div key={i} style={{
+            ...card, padding: "12px 6px", flex: 1, textAlign: "center",
+            animation: `renewStaggerIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both`,
+            animationDelay: `${i * 0.08}s`,
+          }}>
             <div style={{ ...statNum(s.color), fontSize: 16 }}>{s.value}</div>
             <div style={{ ...statLabel, fontSize: 7 }}>{s.label}</div>
           </div>
@@ -1769,21 +1953,31 @@ export default function Renew() {
     </div>
   );
 
+  // Screen content wrapper with transition animation
+  const screenContent = (() => {
+    switch (screen) {
+      case "home": return renderHome();
+      case "pick-category": return renderPickCategory();
+      case "pick-passage": return renderPickPassage();
+      case "custom": return renderCustom();
+      case "session": return renderSession();
+      case "summary": return renderSummary();
+      case "history": return renderHistory();
+      default: return null;
+    }
+  })();
+
   return (
-    <div style={{
+    <div className="renew-noise" style={{
       background: P.black, width: "100%", height: "100%",
       position: "relative", overflow: "hidden", fontFamily: FONT,
     }}>
       <div style={{ position: "absolute", inset: 0 }}>
         <canvas ref={canvasRef} style={{ display: "block", width: "100%", height: "100%" }} />
       </div>
-      {screen === "home" && renderHome()}
-      {screen === "pick-category" && renderPickCategory()}
-      {screen === "pick-passage" && renderPickPassage()}
-      {screen === "custom" && renderCustom()}
-      {screen === "session" && renderSession()}
-      {screen === "summary" && renderSummary()}
-      {screen === "history" && renderHistory()}
+      <div key={screen} className={screen !== "session" ? "renew-screen-enter" : ""} style={{ position: "absolute", inset: 0, zIndex: 10 }}>
+        {screenContent}
+      </div>
     </div>
   );
 }
