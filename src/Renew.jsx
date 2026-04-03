@@ -1052,6 +1052,22 @@ function RenewInner() {
       const st = { ...saved };
       st.neurons = saved.neurons.map(n => Object.assign(new Neuron(n.x, n.y, n.id, n.pillar), n));
       st.synapses = saved.synapses.map(s => Object.assign(new Synapse(s.from, s.to, s.id), s));
+      // Recenter neurons to current canvas dimensions — saved coordinates may be
+      // from a different canvas size (rotation, DPR change, old 0-dim bug, etc.)
+      if (st.neurons.length > 0 && w > 10 && h > 10) {
+        let sx = 0, sy = 0;
+        st.neurons.forEach(n => { sx += n.x; sy += n.y; });
+        sx /= st.neurons.length;
+        sy /= st.neurons.length;
+        const dx = w / 2 - sx, dy = h / 2 - sy;
+        // Only recenter if the group is significantly off-center
+        if (Math.abs(dx) > w * 0.15 || Math.abs(dy) > h * 0.15) {
+          st.neurons.forEach(n => {
+            n.x = Math.max(30, Math.min(w - 30, n.x + dx));
+            n.y = Math.max(70, Math.min(h - 70, n.y + dy));
+          });
+        }
+      }
       return st;
     }
     return createInitialState(w, h, pillar);
@@ -1382,9 +1398,52 @@ function RenewInner() {
     const loop = () => {
       if (!run) return;
       const dpr = window.devicePixelRatio || 1;
+
+      // ── Per-frame canvas size check ──
+      // Ensures canvas buffer matches its CSS layout size on every frame.
+      // Fixes: canvas stuck at 0×0 if parent hadn't rendered at mount,
+      // canvas not updating when screen changes, iPhone rotation, etc.
+      const parentW = c.parentElement ? c.parentElement.clientWidth : 0;
+      const parentH = c.parentElement ? c.parentElement.clientHeight : 0;
+      const needW = Math.round(parentW * dpr);
+      const needH = Math.round(parentH * dpr);
+      if (c.width !== needW || c.height !== needH) {
+        c.width = needW;
+        c.height = needH;
+      }
+
       const w = c.width / dpr, h = c.height / dpr, st = stateRef.current;
+      if (w === 0 || h === 0) { animRef.current = requestAnimationFrame(loop); return; }
       // Scale canvas context for retina sharpness
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      // ── Reposition neurons if they're outside the visible canvas ──
+      if (st && st.neurons && st.neurons.length > 0 && w > 10 && h > 10) {
+        // Check if neurons are collectively off-center (e.g., saved from different canvas size)
+        let cx = 0, cy = 0;
+        for (const n of st.neurons) { cx += n.x; cy += n.y; }
+        cx /= st.neurons.length; cy /= st.neurons.length;
+        const offX = Math.abs(cx - w / 2), offY = Math.abs(cy - h / 2);
+        if (offX > w * 0.35 || offY > h * 0.35 || cx < 5 || cy < 5 || cx > w - 5 || cy > h - 5) {
+          // Group is far from center — recenter all neurons
+          const dx = w / 2 - cx, dy = h / 2 - cy;
+          for (const n of st.neurons) {
+            n.x = Math.max(30, Math.min(w - 30, n.x + dx));
+            n.y = Math.max(70, Math.min(h - 70, n.y + dy));
+          }
+        } else {
+          // Just clamp individual neurons to visible area
+          for (const n of st.neurons) {
+            if (n.x <= 1 && n.y <= 1) {
+              n.x = w * 0.3 + Math.random() * w * 0.4;
+              n.y = h * 0.3 + Math.random() * h * 0.4;
+            } else {
+              n.x = Math.max(30, Math.min(w - 30, n.x));
+              n.y = Math.max(70, Math.min(h - 70, n.y));
+            }
+          }
+        }
+      }
       if (!st) { animRef.current = requestAnimationFrame(loop); return; }
       const now = Date.now();
 
@@ -2778,7 +2837,7 @@ function RenewInner() {
             position: "fixed", bottom: 4, right: 8,
             fontSize: 8, color: "#222", fontFamily: "monospace",
             pointerEvents: "none", zIndex: 9999,
-          }}>v2026.04.03c</div>
+          }}>v2026.04.03e</div>
         </div>
       );
     }
