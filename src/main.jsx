@@ -14,6 +14,13 @@ if ('serviceWorker' in navigator) {
   });
 }
 
+// Fix 6: Clear orphaned caches (renew-v1 etc.) that persist after SW self-destruct
+if (window.caches) {
+  caches.keys().then(names => {
+    names.forEach(name => caches.delete(name));
+  });
+}
+
 // Bug 6 fix: Check for app updates (PWA cache-busting on iPhone)
 if (navigator.onLine) {
   setTimeout(() => {

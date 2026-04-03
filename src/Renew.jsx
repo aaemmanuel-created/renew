@@ -2921,6 +2921,13 @@ function RenewInner() {
               JOSHUA 1:8
             </div>
           </div>
+
+          {/* Fix 4: Version indicator — update this string every upload */}
+          <div style={{
+            position: "fixed", bottom: 4, right: 8,
+            fontSize: 8, color: "#222", fontFamily: "monospace",
+            pointerEvents: "none", zIndex: 9999,
+          }}>v2026.04.03a</div>
         </div>
       );
     }
