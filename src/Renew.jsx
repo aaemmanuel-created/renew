@@ -772,7 +772,7 @@ function bezPt(p0x, p0y, cpx, cpy, p1x, p1y, t) {
   return [mt * mt * p0x + 2 * mt * t * cpx + t * t * p1x, mt * mt * p0y + 2 * mt * t * cpy + t * t * p1y];
 }
 
-function addNeuron(state, w, h, pillar) {
+function addNeuron(state, w, h, pillar, growthParticlesRef) {
   const id = state.nextId++;
   const parent = state.neurons[Math.floor(Math.random() * state.neurons.length)];
   const ang = Math.random() * Math.PI * 2;
@@ -795,22 +795,52 @@ function addNeuron(state, w, h, pillar) {
       o.connections.push(s2); neuron.connections.push(s2); break;
     }
   }
+  // Concept E: Emit birth celebration particles (spiral outward)
+  if (growthParticlesRef && growthParticlesRef.current) {
+    for (let i = 0; i < 25; i++) {
+      const a = (i / 25) * Math.PI * 2 + Math.random() * 0.3;
+      const speed = 0.8 + Math.random() * 1.5;
+      growthParticlesRef.current.push({
+        x: neuron.x, y: neuron.y,
+        vx: Math.cos(a) * speed, vy: Math.sin(a) * speed,
+        life: 1, decay: 0.012 + Math.random() * 0.008,
+        size: 1 + Math.random() * 2,
+        pillar: neuron.pillar,
+        type: 'birth',
+      });
+    }
+    // Cap growth particles pool
+    if (growthParticlesRef.current.length > 200) {
+      growthParticlesRef.current = growthParticlesRef.current.slice(-150);
+    }
+  }
   return neuron;
 }
 
-function fireNeuron(state, neuron, sMap) {
+function fireNeuron(state, neuron, sMap, ripplesRef, growthParticlesRef) {
   neuron.fireLevel = 0.5; neuron.totalFired++;
   neuron.energy = Math.min(1, neuron.energy + 0.003);
   state.sessionFires++;
   for (const sid of neuron.connections) {
     const s = sMap ? sMap.get(sid) : state.synapses.find(x => x.id === sid);
-    if (s && !s.forming) { // only fire through formed connections
+    if (s && !s.forming) {
       s.pulsePos = s.from === neuron.id ? 0 : 1;
       s.activity = 0.4;
       s.strength = Math.min(1, s.strength + 0.0005);
       s.totalPulses++;
       s.width = Math.min(1.8, 0.3 + s.totalPulses * 0.002);
     }
+  }
+  // Concept E: Emit firing cascade ripple
+  if (ripplesRef && ripplesRef.current) {
+    ripplesRef.current.push({
+      x: neuron.x, y: neuron.y,
+      radius: 0, maxRadius: 60 + Math.random() * 40,
+      opacity: 0.25, speed: 1.2 + Math.random() * 0.8,
+      pillar: neuron.pillar,
+    });
+    // Cap ripples pool
+    if (ripplesRef.current.length > 20) ripplesRef.current.shift();
   }
 }
 
@@ -825,8 +855,12 @@ function RenewInner() {
   const audioCtxRef = useRef(null);
   const analyserRef = useRef(null);
   const streamRef = useRef(null);
-  const particlesRef = useRef(null);  // Ambient void particles
+  const particlesRef = useRef(null);  // Neural dust particles (200+)
   const breathPhaseRef = useRef(0);   // Global heartbeat rhythm
+  const ripplesRef = useRef([]);      // Firing cascade ripples
+  const growthParticlesRef = useRef([]); // Birth/growth celebration particles
+  const freqDataRef = useRef(null);   // Raw frequency data for waveform ring
+  const shimmerTimerRef = useRef(0);  // Mature network shimmer timer
   const toneRef = useRef(null);
   const sessionStartRef = useRef({ neurons: 0, synapses: 0, dendrites: 0, speakTime: 0 });
   const lastGrowthRef = useRef(null);
@@ -1088,16 +1122,20 @@ function RenewInner() {
       c.width = logicalW * dpr;
       c.height = logicalH * dpr;
       if (!stateRef.current) stateRef.current = createInitialState(logicalW, logicalH);
-      // Initialize ambient particle system
+      // Initialize neural dust particle system (200+ particles with attraction behavior)
       if (!particlesRef.current) {
-        particlesRef.current = Array.from({length: 40}, () => ({
+        particlesRef.current = Array.from({length: 200}, () => ({
           x: Math.random() * logicalW,
           y: Math.random() * logicalH,
-          vx: (Math.random() - 0.5) * 0.15,
-          vy: (Math.random() - 0.5) * 0.15,
-          size: 0.5 + Math.random() * 1.5,
-          opacity: 0.02 + Math.random() * 0.04,
+          homeX: Math.random() * logicalW,
+          homeY: Math.random() * logicalH,
+          vx: (Math.random() - 0.5) * 0.12,
+          vy: (Math.random() - 0.5) * 0.12,
+          size: 0.3 + Math.random() * 1.2,
+          opacity: 0.015 + Math.random() * 0.035,
           phase: Math.random() * Math.PI * 2,
+          depth: Math.random(), // 0=far, 1=near (for depth layers)
+          attracted: false, // whether currently attracted to a neuron
         }));
       }
     };
@@ -1359,8 +1397,9 @@ function RenewInner() {
       if (analyserRef.current) {
         const d = new Uint8Array(analyserRef.current.frequencyBinCount);
         analyserRef.current.getByteFrequencyData(d);
+        // Store raw frequency data for waveform ring visualization
+        freqDataRef.current = d;
         // Focus on speech frequencies (~85-800Hz) — bins 2-40 of 256 bins at 48kHz
-        // This ignores high-frequency noise and low rumble, giving a cleaner voice signal
         const speechStart = 2, speechEnd = Math.min(50, d.length);
         let sum = 0, peak = 0;
         for (let i = speechStart; i < speechEnd; i++) {
@@ -1369,9 +1408,7 @@ function RenewInner() {
         }
         const avg = sum / (speechEnd - speechStart) / 255;
         const peakNorm = peak / 255;
-        // Blend average and peak for responsive yet stable signal
         vol = avg * 0.4 + peakNorm * 0.6;
-        // Apply gentle curve to make quiet speech more visible
         vol = Math.pow(vol, 0.7);
       }
       const spk = vol > 0.08;
@@ -1412,7 +1449,7 @@ function RenewInner() {
         // Fire neurons — every 1.5-3 seconds, responsive heartbeat
         if (now - lastFireRef.current > Math.max(1500, 3000 - vol * 1500)) {
           lastFireRef.current = now;
-          fireNeuron(st, st.neurons[Math.floor(Math.random() * st.neurons.length)], synapseMap);
+          fireNeuron(st, st.neurons[Math.floor(Math.random() * st.neurons.length)], synapseMap, ripplesRef, growthParticlesRef);
           // Sound: crystalline fire tone
           if (toneRef.current) {
             const notes = ["C5", "E5", "G5", "B5", "D6", "A5"];
@@ -1431,7 +1468,7 @@ function RenewInner() {
         // Spawn new neuron — requires 25-50+ seconds of accumulated speaking
         const si = 25 + Math.min(st.neurons.length * 5, 25);
         if (speakAccRef.current > si && st.neurons.length < 50) {
-          speakAccRef.current = 0; addNeuron(st, w, h, sessionPillar);
+          speakAccRef.current = 0; addNeuron(st, w, h, sessionPillar, growthParticlesRef);
           setNeuronCount(st.neurons.length); setSynapseCount(st.synapses.length);
           // Sound: deep spawn tone
           if (toneRef.current) {
@@ -1459,18 +1496,72 @@ function RenewInner() {
       breathPhaseRef.current += breathSpeed;
       const breath = Math.sin(breathPhaseRef.current) * 0.5 + 0.5; // 0 to 1
 
-      // Update ambient particles
+      // ─── Update neural dust particles (attraction to active neurons) ───
       if (particlesRef.current) {
+        // Find nearest firing neuron for attraction
         for (const p of particlesRef.current) {
+          p.phase += 0.008 + p.depth * 0.004;
+          let nearestFire = null, nearestDist = 150;
+          if (isSessionScreen && spk) {
+            for (const n of st.neurons) {
+              if (n.fireLevel > 0.15) {
+                const dx = n.x - p.x, dy = n.y - p.y;
+                const d2 = Math.sqrt(dx * dx + dy * dy);
+                if (d2 < nearestDist) { nearestDist = d2; nearestFire = n; }
+              }
+            }
+          }
+          if (nearestFire) {
+            // Attract toward firing neuron
+            const dx = nearestFire.x - p.x, dy = nearestFire.y - p.y;
+            const pull = 0.015 * nearestFire.fireLevel;
+            p.vx += dx / nearestDist * pull;
+            p.vy += dy / nearestDist * pull;
+            p.attracted = true;
+          } else {
+            // Drift back toward home position gently
+            p.vx += (p.homeX - p.x) * 0.0003;
+            p.vy += (p.homeY - p.y) * 0.0003;
+            p.attracted = false;
+          }
+          // Damping
+          p.vx *= 0.985;
+          p.vy *= 0.985;
           p.x += p.vx;
           p.y += p.vy;
-          p.phase += 0.01;
-          if (p.x < 0) p.x = w;
-          if (p.x > w) p.x = 0;
-          if (p.y < 0) p.y = h;
-          if (p.y > h) p.y = 0;
+          // Wrap around
+          if (p.x < -10) p.x = w + 10;
+          if (p.x > w + 10) p.x = -10;
+          if (p.y < -10) p.y = h + 10;
+          if (p.y > h + 10) p.y = -10;
         }
       }
+
+      // ─── Update ripples (firing cascade rings) ───
+      for (let i = ripplesRef.current.length - 1; i >= 0; i--) {
+        const r = ripplesRef.current[i];
+        r.radius += r.speed;
+        r.opacity -= 0.004;
+        if (r.opacity <= 0 || r.radius > r.maxRadius) {
+          ripplesRef.current.splice(i, 1);
+        }
+      }
+
+      // ─── Update growth particles ───
+      for (let i = growthParticlesRef.current.length - 1; i >= 0; i--) {
+        const gp = growthParticlesRef.current[i];
+        gp.x += gp.vx;
+        gp.y += gp.vy;
+        gp.vx *= 0.97; // slow down over time (spiral feel)
+        gp.vy *= 0.97;
+        gp.life -= gp.decay;
+        if (gp.life <= 0) {
+          growthParticlesRef.current.splice(i, 1);
+        }
+      }
+
+      // ─── Shimmer timer (mature network twinkling) ───
+      shimmerTimerRef.current += 1;
 
       for (const n of st.neurons) {
         n.x += n.vx; n.y += n.vy;
@@ -1536,31 +1627,79 @@ function RenewInner() {
         s.activity *= 0.995;      // activity barely fades
       }
 
-      // ─── RENDER ───
-      // Adaptive trail: ethereal ghost trails when speaking, cleaner when silent
-      const trailAlpha = isSessionScreen && spk ? 0.05 : 0.12;
+      // ─── RENDER (Concept E: Neural Constellation) ───
+      // Adaptive trail: longer trails when speaking for ethereal ghost effect
+      const trailAlpha = isSessionScreen && spk ? 0.04 : 0.10;
       ctx.fillStyle = `rgba(0, 0, 0, ${trailAlpha})`;
       ctx.fillRect(0, 0, w, h);
 
-      // Subtle depth fog gradient that breathes — tied to drone rhythm
+      // ── Enhancement 6: Voice volume heat map — warm amber tint during speech ──
+      if (isSessionScreen && vol > 0.05) {
+        const heatGrad = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.max(w, h) * 0.5);
+        const heatOpacity = vol * 0.03;
+        heatGrad.addColorStop(0, `rgba(255, 180, 80, ${heatOpacity})`);
+        heatGrad.addColorStop(0.5, `rgba(255, 140, 50, ${heatOpacity * 0.3})`);
+        heatGrad.addColorStop(1, `rgba(0, 0, 0, 0)`);
+        ctx.fillStyle = heatGrad;
+        ctx.fillRect(0, 0, w, h);
+      }
+
+      // Breathing depth fog gradient
       const fogGradient = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.max(w, h) * 0.7);
-      const fogOpacity = (0.025 + breath * 0.045) * (isSessionScreen && spk ? 1.2 : 0.6);
-      fogGradient.addColorStop(0, `${spc.fogRGB}${fogOpacity * 0.1})`);
-      fogGradient.addColorStop(0.4, `${spc.fogRGB}${fogOpacity * 0.05})`);
+      const fogOpacity = (0.025 + breath * 0.045) * (isSessionScreen && spk ? 1.4 : 0.6);
+      fogGradient.addColorStop(0, `${spc.fogRGB}${fogOpacity * 0.12})`);
+      fogGradient.addColorStop(0.4, `${spc.fogRGB}${fogOpacity * 0.06})`);
       fogGradient.addColorStop(1, `${spc.fogRGB}0)`);
       ctx.fillStyle = fogGradient;
       ctx.beginPath(); ctx.arc(w / 2, h / 2, Math.max(w, h), 0, Math.PI * 2); ctx.fill();
 
-      // Ambient particle system — persistent glowing dots
+      // ── Enhancement 3: Firing cascade ripples ──
+      for (const rp of ripplesRef.current) {
+        const rc = getPillarCached(rp.pillar);
+        ctx.strokeStyle = `${rc.brightRGB}${rp.opacity * 0.6})`;
+        ctx.lineWidth = 1.5 * (1 - rp.radius / rp.maxRadius);
+        ctx.beginPath(); ctx.arc(rp.x, rp.y, rp.radius, 0, Math.PI * 2); ctx.stroke();
+        // Soft glow fill inside ripple
+        const rpGlow = ctx.createRadialGradient(rp.x, rp.y, rp.radius * 0.8, rp.x, rp.y, rp.radius);
+        rpGlow.addColorStop(0, `${rc.fogRGB}0)`);
+        rpGlow.addColorStop(1, `${rc.softRGB}${rp.opacity * 0.08})`);
+        ctx.fillStyle = rpGlow;
+        ctx.beginPath(); ctx.arc(rp.x, rp.y, rp.radius, 0, Math.PI * 2); ctx.fill();
+      }
+
+      // ── Enhancement 5: Neural dust particles (depth-layered, attracted to active neurons) ──
+      // Render FAR particles first (depth < 0.33)
       if (particlesRef.current) {
         for (const p of particlesRef.current) {
           const pulseFade = Math.sin(p.phase) * 0.5 + 0.5;
-          const pOp = p.opacity * (0.6 + pulseFade * 0.4);
-          const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size * 2);
-          g.addColorStop(0, `${spc.fogRGB}${pOp})`);
-          g.addColorStop(1, `${spc.deepRGB}0)`);
-          ctx.fillStyle = g;
-          ctx.beginPath(); ctx.arc(p.x, p.y, p.size * 2, 0, Math.PI * 2); ctx.fill();
+          // Depth affects size and opacity: far = smaller & dimmer
+          const depthScale = 0.4 + p.depth * 0.6;
+          const attractBoost = p.attracted ? 1.8 : 1;
+          const pOp = p.opacity * (0.5 + pulseFade * 0.5) * depthScale * attractBoost;
+          const pSize = p.size * depthScale;
+          // Simple dot for performance (no gradient for far particles)
+          if (p.depth < 0.33) {
+            ctx.fillStyle = `${spc.dimRGB}${pOp * 0.7})`;
+            ctx.beginPath(); ctx.arc(p.x, p.y, pSize, 0, Math.PI * 2); ctx.fill();
+          }
+        }
+      }
+
+      // ── Enhancement 5 (cont): Mid-depth particles (0.33-0.66) ──
+      if (particlesRef.current) {
+        for (const p of particlesRef.current) {
+          if (p.depth >= 0.33 && p.depth < 0.66) {
+            const pulseFade = Math.sin(p.phase) * 0.5 + 0.5;
+            const depthScale = 0.4 + p.depth * 0.6;
+            const attractBoost = p.attracted ? 1.8 : 1;
+            const pOp = p.opacity * (0.5 + pulseFade * 0.5) * depthScale * attractBoost;
+            const pSize = p.size * depthScale;
+            const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, pSize * 2);
+            g.addColorStop(0, `${spc.fogRGB}${pOp})`);
+            g.addColorStop(1, `${spc.deepRGB}0)`);
+            ctx.fillStyle = g;
+            ctx.beginPath(); ctx.arc(p.x, p.y, pSize * 2, 0, Math.PI * 2); ctx.fill();
+          }
         }
       }
 
@@ -1634,11 +1773,25 @@ function RenewInner() {
       }
 
       // ─── Neurons — luminous cell bodies with radiating neurites ───
-      // Inspired by live-cell microscopy: bright soma, starburst neurites, growth cones
+      // Concept E: Enhanced with shimmer effect for mature networks
       for (const n of st.neurons) {
-        const pc = getPillarCached(n.pillar); // per-neuron pillar palette (cached RGB strings)
+        const pc = getPillarCached(n.pillar);
         const pulse = Math.sin(n.pulsePhase) * 0.06 + 0.94;
-        const r = n.radius * n.maturity * pulse, fire = n.fireLevel, energy = n.energy;
+        const r = n.radius * n.maturity * pulse;
+        // Enhancement 7: Mature network shimmer — random neurons briefly flash brighter
+        let fire = n.fireLevel;
+        if (st.neurons.length >= 15 && !isSessionScreen) {
+          // Gentle ambient shimmer on non-session screens
+          if (shimmerTimerRef.current % 90 === n.id % 90) {
+            fire = Math.max(fire, 0.25 + Math.random() * 0.15);
+          }
+        } else if (st.neurons.length >= 10 && isSessionScreen && !spk) {
+          // Subtle twinkle in silence during session
+          if (shimmerTimerRef.current % 60 === n.id % 60) {
+            fire = Math.max(fire, 0.15 + Math.random() * 0.1);
+          }
+        }
+        const energy = n.energy;
         const breathMod = 1 + breath * 0.12;
         const lum = 0.4 + energy * 0.6; // luminosity factor — brighter with energy
 
@@ -1810,6 +1963,75 @@ function RenewInner() {
         hlGrad.addColorStop(1, `${pc.midRGB}0)`);
         ctx.fillStyle = hlGrad; ctx.beginPath(); ctx.arc(hlX, hlY, hlR, 0, Math.PI * 2); ctx.fill();
       }
+
+      // ── Enhancement 5 (cont): Near-depth particles (0.66-1.0) — rendered on top ──
+      if (particlesRef.current) {
+        for (const p of particlesRef.current) {
+          if (p.depth >= 0.66) {
+            const pulseFade = Math.sin(p.phase) * 0.5 + 0.5;
+            const depthScale = 0.4 + p.depth * 0.6;
+            const attractBoost = p.attracted ? 2.0 : 1;
+            const pOp = p.opacity * (0.5 + pulseFade * 0.5) * depthScale * attractBoost;
+            const pSize = p.size * depthScale;
+            const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, pSize * 2.5);
+            g.addColorStop(0, `${spc.brightRGB}${pOp * 1.2})`);
+            g.addColorStop(0.4, `${spc.fogRGB}${pOp * 0.5})`);
+            g.addColorStop(1, `${spc.deepRGB}0)`);
+            ctx.fillStyle = g;
+            ctx.beginPath(); ctx.arc(p.x, p.y, pSize * 2.5, 0, Math.PI * 2); ctx.fill();
+          }
+        }
+      }
+
+      // ── Enhancement 4: Growth celebration particles ──
+      for (const gp of growthParticlesRef.current) {
+        const gc = getPillarCached(gp.pillar);
+        const gpOp = gp.life * 0.6;
+        const gpSize = gp.size * (1 + (1 - gp.life) * 0.5); // grow slightly as they fade
+        const gpGrad = ctx.createRadialGradient(gp.x, gp.y, 0, gp.x, gp.y, gpSize);
+        gpGrad.addColorStop(0, `${gc.brightRGB}${gpOp})`);
+        gpGrad.addColorStop(0.5, `${gc.softRGB}${gpOp * 0.3})`);
+        gpGrad.addColorStop(1, `${gc.fogRGB}0)`);
+        ctx.fillStyle = gpGrad;
+        ctx.beginPath(); ctx.arc(gp.x, gp.y, gpSize, 0, Math.PI * 2); ctx.fill();
+      }
+
+      // ── Enhancement 1: Voice waveform ring ──
+      if (isSessionScreen && freqDataRef.current) {
+        const fd = freqDataRef.current;
+        const cx = w / 2, cy = h / 2;
+        const baseRadius = Math.min(w, h) * 0.18;
+        const numPoints = 64;
+        // Draw the waveform ring
+        ctx.beginPath();
+        for (let i = 0; i <= numPoints; i++) {
+          const angle = (i / numPoints) * Math.PI * 2 - Math.PI / 2;
+          const freqIdx = Math.floor((i / numPoints) * Math.min(64, fd.length));
+          const freqVal = fd[freqIdx] || 0;
+          const displacement = (freqVal / 255) * 25 * vol;
+          const rr = baseRadius + displacement;
+          const px = cx + Math.cos(angle) * rr;
+          const py = cy + Math.sin(angle) * rr;
+          if (i === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        // Faint ring — more visible when speaking
+        const ringOpacity = spk ? 0.08 + vol * 0.12 : 0.02;
+        ctx.strokeStyle = `${spc.softRGB}${ringOpacity})`;
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+        // Inner glow fill
+        if (spk) {
+          const ringGlow = ctx.createRadialGradient(cx, cy, baseRadius * 0.5, cx, cy, baseRadius + 30);
+          ringGlow.addColorStop(0, `${spc.fogRGB}0)`);
+          ringGlow.addColorStop(0.8, `${spc.fogRGB}${vol * 0.02})`);
+          ringGlow.addColorStop(1, `${spc.fogRGB}0)`);
+          ctx.fillStyle = ringGlow;
+          ctx.fill();
+        }
+      }
+
       animRef.current = requestAnimationFrame(loop);
     };
     animRef.current = requestAnimationFrame(loop);
