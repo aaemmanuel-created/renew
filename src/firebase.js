@@ -2,7 +2,7 @@
 // Values are injected at build time from environment variables
 // Set these in GitHub repo Settings → Secrets → Actions
 import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider } from "firebase/auth";
+import { getAuth, GoogleAuthProvider, browserLocalPersistence, setPersistence } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
@@ -16,5 +16,9 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
+// Explicitly set LOCAL persistence so auth survives PWA updates, cache clears, and iOS reloads.
+// Default "local" uses IndexedDB which iOS Safari may clear during aggressive cache busting.
+// This ensures the auth token is stored in the most resilient way available.
+setPersistence(auth, browserLocalPersistence).catch(() => {});
 export const googleProvider = new GoogleAuthProvider();
 export const db = getFirestore(app);

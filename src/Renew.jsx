@@ -2312,6 +2312,23 @@ function RenewInner() {
         </div>
       )}
 
+      {/* Refresh — top left, subtle */}
+      <button onClick={() => {
+        // Hard refresh: bypass all caches
+        if (window.caches) caches.keys().then(names => names.forEach(n => caches.delete(n)));
+        window.location.reload();
+      }} style={{
+        position: "absolute", top: "max(20px, env(safe-area-inset-top, 20px))", left: "max(22px, env(safe-area-inset-left, 22px))",
+        background: "none", border: "none", color: P.textDim, fontSize: 9,
+        cursor: "pointer", fontFamily: FONT, letterSpacing: 1, padding: "4px 0",
+        transition: "color 0.3s", display: "flex", alignItems: "center", gap: 4,
+      }}>
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+          <path d="M13.5 8A5.5 5.5 0 1 1 8 2.5M8 2.5V6M8 2.5L11 2.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+        REFRESH
+      </button>
+
       {/* Sign out — top right, subtle */}
       <button onClick={handleSignOut} style={{
         position: "absolute", top: "max(20px, env(safe-area-inset-top, 20px))", right: "max(22px, env(safe-area-inset-right, 22px))",
@@ -3103,7 +3120,7 @@ function RenewInner() {
             position: "fixed", bottom: 4, right: 8,
             fontSize: 8, color: "#222", fontFamily: "monospace",
             pointerEvents: "none", zIndex: 9999,
-          }}>v2026.04.03f</div>
+          }}>v2026.04.03g</div>
         </div>
       );
     }
