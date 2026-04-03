@@ -1611,12 +1611,19 @@ function RenewInner() {
       }
 
       // ═══════════════════════════════════════════════════════════
-      // ─── RENDER (Concept D: Starfield Genesis) ───
-      // "In the beginning God created the heavens..." — Genesis 1:1
+      // ─── RENDER ───
       // ═══════════════════════════════════════════════════════════
 
-      // Deep space fade — longer trails create nebula persistence
-      const trailAlpha = isSessionScreen && spk ? 0.025 : 0.08;
+      // Session screen: pure black void — no animation
+      if (isSessionScreen) {
+        ctx.fillStyle = "#000000";
+        ctx.fillRect(0, 0, w, h);
+        animRef.current = requestAnimationFrame(loop);
+        return;
+      }
+
+      // Non-session screens: gentle ambient background
+      const trailAlpha = 0.15;
       ctx.fillStyle = `rgba(0, 0, 0, ${trailAlpha})`;
       ctx.fillRect(0, 0, w, h);
 
