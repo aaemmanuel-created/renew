@@ -4,6 +4,38 @@ import { auth, googleProvider, db } from "./firebase";
 import { onAuthStateChanged, signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 
+// ─── Simplex 2D Noise (lightweight, no library) ───
+// Returns smooth organic noise in range -1 to 1
+const _SN_GRAD = [[1,1],[-1,1],[1,-1],[-1,-1],[1,0],[-1,0],[0,1],[0,-1]];
+const _SN_PERM = new Uint8Array(512);
+(() => {
+  const p = Array.from({length: 256}, (_, i) => i);
+  for (let i = 255; i > 0; i--) { const j = (i * 7919 + 1) & 255; const tmp = p[i]; p[i] = p[j]; p[j] = tmp; }
+  for (let i = 0; i < 512; i++) _SN_PERM[i] = p[i & 255];
+})();
+function noise2D(x, y) {
+  const F2 = 0.36602540378, G2 = 0.21132486540; // (sqrt(3)-1)/2, (3-sqrt(3))/6
+  const s = (x + y) * F2;
+  const i = Math.floor(x + s), j = Math.floor(y + s);
+  const t = (i + j) * G2;
+  const x0 = x - (i - t), y0 = y - (j - t);
+  const i1 = x0 > y0 ? 1 : 0, j1 = x0 > y0 ? 0 : 1;
+  const x1 = x0 - i1 + G2, y1 = y0 - j1 + G2;
+  const x2 = x0 - 1 + 2 * G2, y2 = y0 - 1 + 2 * G2;
+  const ii = i & 255, jj = j & 255;
+  const gi0 = _SN_PERM[ii + _SN_PERM[jj]] & 7;
+  const gi1 = _SN_PERM[ii + i1 + _SN_PERM[jj + j1]] & 7;
+  const gi2 = _SN_PERM[ii + 1 + _SN_PERM[jj + 1]] & 7;
+  let n0 = 0, n1 = 0, n2 = 0;
+  let t0 = 0.5 - x0 * x0 - y0 * y0;
+  if (t0 > 0) { t0 *= t0; n0 = t0 * t0 * (_SN_GRAD[gi0][0] * x0 + _SN_GRAD[gi0][1] * y0); }
+  let t1 = 0.5 - x1 * x1 - y1 * y1;
+  if (t1 > 0) { t1 *= t1; n1 = t1 * t1 * (_SN_GRAD[gi1][0] * x1 + _SN_GRAD[gi1][1] * y1); }
+  let t2 = 0.5 - x2 * x2 - y2 * y2;
+  if (t2 > 0) { t2 *= t2; n2 = t2 * t2 * (_SN_GRAD[gi2][0] * x2 + _SN_GRAD[gi2][1] * y2); }
+  return 70 * (n0 + n1 + n2);
+}
+
 // ─── Bug 10 fix: Error Boundary ───
 class RenewErrorBoundary extends Component {
   constructor(props) { super(props); this.state = { hasError: false }; }
@@ -667,14 +699,19 @@ class Neuron {
       // Growth cone at tip — small bulb for "reaching" effect
       const growthCone = {
         size: isAxon ? 1.2 + Math.random() * 1.0 : 0.6 + Math.random() * 0.8,
-        filopodia: Array.from({length: 2 + Math.floor(Math.random() * 3)}, () => ({
-          angle: angle + (Math.random() - 0.5) * 1.5,
-          length: 4 + Math.random() * 10,
+        filopodia: Array.from({length: 2 + Math.floor(Math.random() * 3)}, (_, fi) => ({
+          baseAngle: angle + (Math.random() - 0.5) * 1.5,
+          baseLength: 4 + Math.random() * 10,
+          phase: Math.random() * Math.PI * 2,
+          speed: 0.008 + Math.random() * 0.012,
+          noiseOff: Math.random() * 100,
         })),
+        pulsePhase: Math.random() * Math.PI * 2,
       };
       return {
         angle, length, curve1, curve2, branches, growthCone, isAxon,
         width: isAxon ? 0.9 + Math.random() * 0.6 : 0.4 + Math.random() * 0.7,
+        spineNoiseSeed: Math.random() * 1000,
       };
     });
     // Internal membrane blobs for organic cell body
@@ -752,15 +789,20 @@ function growDendrite(neuron) {
   }));
   const growthCone = {
     size: isAxon ? 1.2 + Math.random() * 1.0 : 0.6 + Math.random() * 0.8,
-    filopodia: Array.from({length: 2 + Math.floor(Math.random() * 3)}, () => ({
-      angle: angle + (Math.random() - 0.5) * 1.5,
-      length: 4 + Math.random() * 10,
+    filopodia: Array.from({length: 2 + Math.floor(Math.random() * 3)}, (_, fi) => ({
+      baseAngle: angle + (Math.random() - 0.5) * 1.5,
+      baseLength: 4 + Math.random() * 10,
+      phase: Math.random() * Math.PI * 2,   // persistent phase for smooth oscillation
+      speed: 0.008 + Math.random() * 0.012,  // oscillation speed (unique per filopodium)
+      noiseOff: Math.random() * 100,          // unique noise offset
     })),
+    pulsePhase: Math.random() * Math.PI * 2, // lamellipodium breathing phase
   };
   const dendrite = {
     angle, length: 0, targetLength: length, // starts at 0, grows to targetLength
     curve1, curve2, branches, growthCone, isAxon,
     width: isAxon ? 0.9 + Math.random() * 0.6 : 0.4 + Math.random() * 0.7,
+    spineNoiseSeed: Math.random() * 1000, // unique seed for spine density clustering
   };
   neuron.dendrites.push(dendrite);
 }
@@ -1544,21 +1586,53 @@ function RenewInner() {
       breathPhaseRef.current += breathSpeed;
       const breath = Math.sin(breathPhaseRef.current) * 0.5 + 0.5; // 0 to 1
 
-      // ─── Update cosmic dust particles (drift + nebula swirl) ───
+      // ─── Update particles: noise-field flow + Brownian motion + depth-based speed ───
       if (particlesRef.current) {
+        const pTime = now * 0.001; // seconds for noise sampling
         for (const p of particlesRef.current) {
-          p.phase += 0.005 + p.depth * 0.003;
-          // Gentle nebula swirl — particles near center orbit slowly
+          p.phase += 0.005 + p.depth * 0.004;
+          // Depth-based speed factor: far particles (depth=0) drift slowly, near (depth=1) faster
+          const speedFactor = 0.3 + p.depth * 0.7;
+
+          // Noise-field flow — smooth organic currents instead of linear drift
+          const flowX = noise2D(p.x * 0.003, p.y * 0.003 + pTime * 0.05) * 0.08 * speedFactor;
+          const flowY = noise2D(p.x * 0.003 + 100, p.y * 0.003 + pTime * 0.05) * 0.08 * speedFactor;
+          p.vx += flowX;
+          p.vy += flowY;
+
+          // Brownian jitter (thermal noise — scaled by particle size, smaller = more jitter)
+          const brownian = 0.015 / (p.size + 0.5);
+          p.vx += (Math.random() - 0.5) * brownian;
+          p.vy += (Math.random() - 0.5) * brownian;
+
+          // Gentle nebula swirl near center
           const dx = p.x - w / 2, dy = p.y - h / 2;
           const dist = Math.sqrt(dx * dx + dy * dy) + 1;
-          const swirlStr = isSessionScreen && spk ? 0.00015 * vol : 0.00003;
+          const swirlStr = isSessionScreen && spk ? 0.00012 * vol : 0.00002;
           p.vx += -dy / dist * swirlStr;
           p.vy += dx / dist * swirlStr;
-          // Drift back toward home
-          p.vx += (p.homeX - p.x) * 0.0002;
-          p.vy += (p.homeY - p.y) * 0.0002;
-          p.vx *= 0.99;
-          p.vy *= 0.99;
+
+          // Neuron attraction — particles near neurons gently orbit
+          if (st.neurons.length > 0 && !p._attractTarget) {
+            // Assign a loose attraction target occasionally
+            if (Math.random() < 0.002) p._attractTarget = st.neurons[Math.floor(Math.random() * st.neurons.length)];
+          }
+          if (p._attractTarget) {
+            const ax = p._attractTarget.x - p.x, ay = p._attractTarget.y - p.y;
+            const ad = Math.sqrt(ax * ax + ay * ay) + 1;
+            if (ad < 80) {
+              // Orbital attraction (perpendicular + inward)
+              p.vx += (ax / ad * 0.0003 - ay / ad * 0.0002);
+              p.vy += (ay / ad * 0.0003 + ax / ad * 0.0002);
+            }
+            if (ad > 150 || Math.random() < 0.003) p._attractTarget = null; // release
+          }
+
+          // Soft drift back toward home (keeps distribution even)
+          p.vx += (p.homeX - p.x) * 0.00015;
+          p.vy += (p.homeY - p.y) * 0.00015;
+          p.vx *= 0.985;
+          p.vy *= 0.985;
           p.x += p.vx;
           p.y += p.vy;
           if (p.x < -10) p.x = w + 10;
@@ -1659,213 +1733,405 @@ function RenewInner() {
       }
 
       // ═══════════════════════════════════════════════════════════
-      // ─── RENDER: Fluorescence Microscopy Style ───
+      // ─── RENDER: Fluorescence Microscopy Style (Enhanced) ───
       // ═══════════════════════════════════════════════════════════
+      const bph = breathPhaseRef.current; // shorthand for noise time
+      const nowS = now * 0.001; // seconds for noise sampling
+
       // ── Layer 1: Pure black background ──
       ctx.fillStyle = "#000000";
       ctx.fillRect(0, 0, w, h);
 
-      // ── Layer 2: Very subtle dark blue-violet noise/fog (barely visible) ──
-      // Faint out-of-focus bokeh blobs drifting slowly
-      const bokehCount = 12;
+      // ── Layer 2: Bokeh blobs — noise-driven drift, varied sizes & colors ──
+      const bokehCount = 15;
       for (let i = 0; i < bokehCount; i++) {
-        const bokehX = (w * (i * 0.618 + Math.sin(breathPhaseRef.current * 0.2 + i) * 0.15)) % w;
-        const bokehY = (h * (i * 0.382 + Math.cos(breathPhaseRef.current * 0.15 + i) * 0.12)) % h;
-        const bokehR = 40 + Math.sin(breathPhaseRef.current * 0.1 + i) * 20;
+        const nx = noise2D(i * 3.7, nowS * 0.08) * 0.5 + 0.5;
+        const ny = noise2D(i * 3.7 + 100, nowS * 0.06) * 0.5 + 0.5;
+        const bokehX = nx * w;
+        const bokehY = ny * h;
+        const bokehR = 30 + noise2D(i * 5.1, nowS * 0.04) * 25 + i * 3;
+        // Alternate warm (magenta) and cool (teal) bokeh for multi-channel look
+        const isWarm = i % 3 === 0;
+        const isCool = i % 3 === 1;
+        const br = isWarm ? 100 : isCool ? 50 : 80;
+        const bg = isWarm ? 50 : isCool ? 80 : 60;
+        const bb = isWarm ? 90 : isCool ? 120 : 120;
+        const bOp = 0.025 + noise2D(i * 2.3, nowS * 0.1) * 0.012;
         const bokehGrad = ctx.createRadialGradient(bokehX, bokehY, 0, bokehX, bokehY, bokehR);
-        bokehGrad.addColorStop(0, `rgba(80, 60, 120, 0.035)`);
-        bokehGrad.addColorStop(0.5, `rgba(100, 80, 140, 0.015)`);
+        bokehGrad.addColorStop(0, `rgba(${br}, ${bg}, ${bb}, ${bOp})`);
+        bokehGrad.addColorStop(0.5, `rgba(${br}, ${bg}, ${bb}, ${bOp * 0.4})`);
         bokehGrad.addColorStop(1, `rgba(0, 0, 0, 0)`);
         ctx.fillStyle = bokehGrad;
         ctx.beginPath(); ctx.arc(bokehX, bokehY, bokehR, 0, Math.PI * 2); ctx.fill();
       }
 
-      // ── Layer 3: Dendrites (tapered lines with growth cones & spines) ──
+      // ── Layer 2.5: Depth-layered dust particles (real particle system) ──
+      if (particlesRef.current) {
+        ctx.lineCap = "round";
+        for (const p of particlesRef.current) {
+          // Depth-based color: far = warm red-shifted, near = cool blue-white
+          const depth = p.depth; // 0=far, 1=near
+          const pr = Math.round(180 - depth * 40);  // far=180, near=140
+          const pg = Math.round(160 - depth * 20);  // far=160, near=140
+          const pb = Math.round(200 + depth * 55);  // far=200, near=255
+          const pSize = (0.4 + depth * 1.2) * p.size * 0.7;
+          const twinkle = 0.5 + 0.5 * Math.sin(p.phase + nowS * 0.8);
+          const pOp = p.opacity * twinkle * (0.6 + depth * 0.4);
+          ctx.fillStyle = `rgba(${pr}, ${pg}, ${pb}, ${pOp})`;
+          ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(0.3, pSize), 0, Math.PI * 2); ctx.fill();
+        }
+      }
+
+      // ── Layer 3: Dendrites — spectral gradient, sheath, clustered spines, persistent filopodia ──
+      ctx.lineCap = "round";
       for (const n of st.neurons) {
+        const fireB = n.fireLevel;
         for (const d of n.dendrites) {
           if (d.length < 0.5) continue;
+          // Noise-modulated sway (dendrites drift as if in fluid)
+          const sway1 = noise2D(n.id * 10 + d.angle * 5, nowS * 0.15) * 3;
+          const sway2 = noise2D(n.id * 10 + d.angle * 5 + 50, nowS * 0.12) * 2;
           const tipX = n.x + Math.cos(d.angle) * d.length;
           const tipY = n.y + Math.sin(d.angle) * d.length;
-          const cp1x = n.x + Math.cos(d.angle) * d.length * 0.35 + d.curve1;
-          const cp1y = n.y + Math.sin(d.angle) * d.length * 0.35 + d.curve2;
+          const cp1x = n.x + Math.cos(d.angle) * d.length * 0.35 + d.curve1 + sway1;
+          const cp1y = n.y + Math.sin(d.angle) * d.length * 0.35 + d.curve2 + sway2;
 
-          // Main dendrite as segmented tapered line (violet/indigo)
+          // ── Sheath: wide translucent stroke underneath ──
+          const sheathSegs = 8;
+          for (let i = 0; i < sheathSegs; i++) {
+            const t0 = i / sheathSegs, t1 = (i + 1) / sheathSegs;
+            const [x0, y0] = bezPt(n.x, n.y, cp1x, cp1y, tipX, tipY, t0);
+            const [x1, y1] = bezPt(n.x, n.y, cp1x, cp1y, tipX, tipY, t1);
+            const tMid = (t0 + t1) / 2;
+            const sheathW = 6 * (1 - tMid * 0.7) * n.maturity;
+            ctx.strokeStyle = `rgba(120, 100, 200, ${0.06 * n.maturity})`;
+            ctx.lineWidth = Math.max(1, sheathW);
+            ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+          }
+
+          // ── Main dendrite: segmented taper with spectral gradient (indigo→cyan at tip) ──
           const dSegs = 12;
           for (let i = 0; i < dSegs; i++) {
             const t0 = i / dSegs, t1 = (i + 1) / dSegs;
             const [x0, y0] = bezPt(n.x, n.y, cp1x, cp1y, tipX, tipY, t0);
             const [x1, y1] = bezPt(n.x, n.y, cp1x, cp1y, tipX, tipY, t1);
             const tMid = (t0 + t1) / 2;
-            // Taper from 2.5px at soma to 0.5px at tip
             const tWidth = 2.5 * (1 - tMid * 0.8) * n.maturity;
-            const fireBoost = n.fireLevel * 0.5;
-            const opacity = (0.4 + fireBoost * 0.3) * n.maturity;
-            // Sharp violet dendrite
-            ctx.strokeStyle = `rgba(140, 120, 220, ${opacity})`;
+            const opacity = (0.45 + fireB * 0.35) * n.maturity;
+            // Spectral shift: indigo at soma → teal-cyan at tip
+            const sr = Math.round(140 - tMid * 60);  // 140→80
+            const sg = Math.round(120 + tMid * 60);  // 120→180
+            const sb = Math.round(220 + tMid * 20);  // 220→240
+            ctx.strokeStyle = `rgba(${sr}, ${sg}, ${sb}, ${opacity})`;
             ctx.lineWidth = Math.max(0.5, tWidth);
-            ctx.lineCap = "round";
             ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
-            // Glow/bloom effect (wider, lower opacity)
-            ctx.strokeStyle = `rgba(160, 140, 230, ${opacity * 0.25})`;
-            ctx.lineWidth = Math.max(0.5, tWidth * 2.5);
+            // Bloom glow (wider, fainter)
+            ctx.strokeStyle = `rgba(${sr + 20}, ${sg + 20}, ${Math.min(255, sb + 10)}, ${opacity * 0.2})`;
+            ctx.lineWidth = Math.max(0.5, tWidth * 2.8);
             ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
           }
 
-          // Dendritic spines: tiny dots along the dendrite
-          const spineCount = Math.ceil(d.length / 20);
-          for (let i = 0; i < spineCount; i++) {
-            const spt = (i + Math.sin(now * 0.001 + i) * 0.2) / spineCount;
-            if (spt >= 0 && spt <= 1) {
-              const [sx, sy] = bezPt(n.x, n.y, cp1x, cp1y, tipX, tipY, spt);
-              const spineOp = (0.3 + n.fireLevel * 0.4) * n.maturity;
-              ctx.fillStyle = `rgba(160, 130, 240, ${spineOp})`;
-              ctx.beginPath(); ctx.arc(sx, sy, 1.5, 0, Math.PI * 2); ctx.fill();
+          // ── Branches with taper ──
+          if (d.branches) {
+            for (const br of d.branches) {
+              const [bx0, by0] = bezPt(n.x, n.y, cp1x, cp1y, tipX, tipY, br.t);
+              const bAng = br.angle;
+              const bTipX = bx0 + Math.cos(bAng) * br.length;
+              const bTipY = by0 + Math.sin(bAng) * br.length;
+              const bSegs = 6;
+              for (let i = 0; i < bSegs; i++) {
+                const bt0 = i / bSegs, bt1 = (i + 1) / bSegs;
+                const bxA = bx0 + (bTipX - bx0) * bt0, byA = by0 + (bTipY - by0) * bt0;
+                const bxB = bx0 + (bTipX - bx0) * bt1, byB = by0 + (bTipY - by0) * bt1;
+                const btMid = (bt0 + bt1) / 2;
+                const bW = 1.5 * (1 - btMid * 0.85) * n.maturity;
+                const bOp = (0.3 + fireB * 0.2) * n.maturity;
+                ctx.strokeStyle = `rgba(110, 140, 220, ${bOp})`;
+                ctx.lineWidth = Math.max(0.3, bW);
+                ctx.beginPath(); ctx.moveTo(bxA, byA); ctx.lineTo(bxB, byB); ctx.stroke();
+              }
             }
           }
 
-          // Growth cone with filopodia at the tip
-          const gc_size = 8;
-          const gc_x = tipX, gc_y = tipY;
-          // Filopodia: 2-4 hair-thin lines extending past tip
-          const filCount = 2 + Math.floor(Math.random() * 3);
-          for (let f = 0; f < filCount; f++) {
-            const filAngle = d.angle + (Math.random() - 0.5) * 0.5;
-            const filLen = 5 + Math.random() * 10;
-            const filX = gc_x + Math.cos(filAngle) * filLen;
-            const filY = gc_y + Math.sin(filAngle) * filLen;
-            ctx.strokeStyle = `rgba(140, 120, 220, ${0.3 * n.maturity})`;
-            ctx.lineWidth = 0.3;
-            ctx.lineCap = "round";
-            ctx.beginPath(); ctx.moveTo(gc_x, gc_y); ctx.lineTo(filX, filY); ctx.stroke();
+          // ── Clustered dendritic spines (noise-modulated density) ──
+          const spineSeed = d.spineNoiseSeed || 0;
+          const spineCount = Math.ceil(d.length / 15);
+          for (let i = 0; i < spineCount; i++) {
+            const spt = (i + 0.5) / spineCount;
+            // Noise determines density — some patches are spine-dense, some bare
+            const spineDensity = noise2D(spineSeed + spt * 8, 0) * 0.5 + 0.5;
+            if (spineDensity < 0.35) continue; // bare region
+            const [sx, sy] = bezPt(n.x, n.y, cp1x, cp1y, tipX, tipY, spt);
+            // Mushroom spines (larger) vs thin spines
+            const isMushroom = spineDensity > 0.75;
+            const spR = isMushroom ? 2.0 : 1.0;
+            const spineOp = (0.25 + fireB * 0.35 + (isMushroom ? 0.1 : 0)) * n.maturity;
+            ctx.fillStyle = `rgba(150, 140, 240, ${spineOp})`;
+            ctx.beginPath(); ctx.arc(sx, sy, spR, 0, Math.PI * 2); ctx.fill();
+            // Mushroom spines get a tiny bright PSD dot
+            if (isMushroom) {
+              ctx.fillStyle = `rgba(200, 200, 255, ${spineOp * 0.6})`;
+              ctx.beginPath(); ctx.arc(sx, sy, 0.7, 0, Math.PI * 2); ctx.fill();
+            }
           }
-          // Growth cone lamellipodium glow
-          const lamGrad = ctx.createRadialGradient(gc_x, gc_y, 0, gc_x, gc_y, 8);
-          lamGrad.addColorStop(0, `rgba(160, 140, 230, ${0.15 * n.maturity})`);
-          lamGrad.addColorStop(1, `rgba(140, 120, 220, 0)`);
-          ctx.fillStyle = lamGrad;
-          ctx.beginPath(); ctx.arc(gc_x, gc_y, 8, 0, Math.PI * 2); ctx.fill();
+
+          // ── Growth cone: persistent filopodia + pulsing lamellipodium ──
+          const gc = d.growthCone;
+          const gc_x = tipX, gc_y = tipY;
+          if (gc && gc.filopodia) {
+            for (const fil of gc.filopodia) {
+              // Animate with persistent phase — smooth, not random
+              fil.phase += fil.speed;
+              const filAngle = fil.baseAngle + noise2D(fil.noiseOff, nowS * 0.3) * 0.4;
+              const filLen = fil.baseLength + Math.sin(fil.phase) * 3;
+              const filX = gc_x + Math.cos(filAngle) * filLen;
+              const filY = gc_y + Math.sin(filAngle) * filLen;
+              // Cyan-tinted at tip (GFP concentration)
+              ctx.strokeStyle = `rgba(100, 180, 230, ${0.35 * n.maturity})`;
+              ctx.lineWidth = 0.4;
+              ctx.beginPath(); ctx.moveTo(gc_x, gc_y); ctx.lineTo(filX, filY); ctx.stroke();
+            }
+            // Lamellipodium glow — pulsing with neuron breath
+            if (gc.pulsePhase !== undefined) gc.pulsePhase += 0.015;
+            const lamPulse = 0.8 + 0.2 * Math.sin(gc.pulsePhase || 0);
+            const lamR = 10 * lamPulse;
+            const lamGrad = ctx.createRadialGradient(gc_x, gc_y, 0, gc_x, gc_y, lamR);
+            lamGrad.addColorStop(0, `rgba(100, 200, 240, ${0.18 * n.maturity * lamPulse})`);
+            lamGrad.addColorStop(1, `rgba(80, 160, 220, 0)`);
+            ctx.fillStyle = lamGrad;
+            ctx.beginPath(); ctx.arc(gc_x, gc_y, lamR, 0, Math.PI * 2); ctx.fill();
+          }
         }
       }
 
-      // Draw synapses as connecting lines and puncta
+      // ── Layer 4: Synapses — calcium wave trails, vesicle bursts, strength-based rendering ──
       for (const s of st.synapses) {
         const from = neuronMap.get(s.from), to = neuronMap.get(s.to);
         if (!from || !to) continue;
         const mx = (from.x + to.x) / 2, my = (from.y + to.y) / 2;
         const cpx = mx + s.cx, cpy = my + s.cy;
         const drawEnd = s.forming ? s.formProgress : 1;
+        const formOp = s.forming ? s.formProgress : 1;
+        const strengthVis = 0.5 + (s.strength || 0.02) * 8; // stronger = more visible
+        const sAlpha = Math.min(1, strengthVis);
 
-        // Thin axon line connecting neurons
-        const segments = 6;
+        // Synapse line — strength-based thickness and opacity
+        const segments = 8;
         for (let i = 0; i < segments; i++) {
           const t0 = i / segments, t1 = (i + 1) / segments;
           if (t0 >= drawEnd) break;
           const actualT1 = Math.min(t1, drawEnd);
           const [x0, y0] = bezPt(from.x, from.y, cpx, cpy, to.x, to.y, t0);
           const [x1, y1] = bezPt(from.x, from.y, cpx, cpy, to.x, to.y, actualT1);
-          const synapseOp = (0.2 + s.activity * 0.3) * (s.forming ? s.formProgress : 1);
-          ctx.strokeStyle = `rgba(120, 100, 200, ${synapseOp})`;
-          ctx.lineWidth = 1;
+          const synapseOp = (0.15 + s.activity * 0.35) * formOp * sAlpha;
+          ctx.strokeStyle = `rgba(110, 100, 200, ${synapseOp})`;
+          ctx.lineWidth = 0.6 + (s.strength || 0) * 4;
           ctx.lineCap = "round";
           ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
         }
 
-        // Synaptic puncta (small bright dots at the synapse location)
+        // Synaptic puncta — cyan-teal tint (different fluorescent channel)
         const [px, py] = bezPt(from.x, from.y, cpx, cpy, to.x, to.y, 0.7);
-        const punctaOp = (0.5 + s.activity * 0.3) * (s.forming ? s.formProgress : 1);
-        // Sharp puncta center
-        ctx.fillStyle = `rgba(170, 180, 255, ${punctaOp})`;
-        ctx.beginPath(); ctx.arc(px, py, 2, 0, Math.PI * 2); ctx.fill();
+        const punctaOp = (0.45 + s.activity * 0.35) * formOp * sAlpha;
+        const punctaR = 1.5 + (s.strength || 0) * 3;
+        ctx.fillStyle = `rgba(130, 200, 240, ${punctaOp})`;
+        ctx.beginPath(); ctx.arc(px, py, punctaR, 0, Math.PI * 2); ctx.fill();
         // Puncta glow
-        const pGlow = ctx.createRadialGradient(px, py, 0, px, py, 6);
-        pGlow.addColorStop(0, `rgba(170, 180, 255, ${punctaOp * 0.5})`);
-        pGlow.addColorStop(1, `rgba(170, 180, 255, 0)`);
+        const pGlow = ctx.createRadialGradient(px, py, 0, px, py, punctaR * 3);
+        pGlow.addColorStop(0, `rgba(130, 200, 240, ${punctaOp * 0.4})`);
+        pGlow.addColorStop(1, `rgba(130, 200, 240, 0)`);
         ctx.fillStyle = pGlow;
-        ctx.beginPath(); ctx.arc(px, py, 6, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(px, py, punctaR * 3, 0, Math.PI * 2); ctx.fill();
 
-        // Synaptic pulse: bright dot traveling along synapse
+        // Calcium wave: comet-tail pulse (5-segment trail with decreasing opacity)
         if (s.pulsePos >= 0 && s.pulsePos <= 1 && !s.forming) {
-          const [ppx, ppy] = bezPt(from.x, from.y, cpx, cpy, to.x, to.y, s.pulsePos);
-          const pulseGlow = ctx.createRadialGradient(ppx, ppy, 0, ppx, ppy, 10);
-          pulseGlow.addColorStop(0, `rgba(200, 210, 255, 0.6)`);
-          pulseGlow.addColorStop(0.6, `rgba(170, 180, 255, 0.2)`);
-          pulseGlow.addColorStop(1, `rgba(170, 180, 255, 0)`);
-          ctx.fillStyle = pulseGlow;
-          ctx.beginPath(); ctx.arc(ppx, ppy, 10, 0, Math.PI * 2); ctx.fill();
+          const trailSteps = 5;
+          for (let t = 0; t < trailSteps; t++) {
+            const trailT = s.pulsePos - t * 0.04;
+            if (trailT < 0 || trailT > 1) continue;
+            const [ptx, pty] = bezPt(from.x, from.y, cpx, cpy, to.x, to.y, trailT);
+            const trailOp = (1 - t / trailSteps) * 0.6;
+            const trailR = 4 + (1 - t / trailSteps) * 6;
+            const pulseGlow = ctx.createRadialGradient(ptx, pty, 0, ptx, pty, trailR);
+            pulseGlow.addColorStop(0, `rgba(200, 220, 255, ${trailOp})`);
+            pulseGlow.addColorStop(0.5, `rgba(150, 200, 250, ${trailOp * 0.3})`);
+            pulseGlow.addColorStop(1, `rgba(130, 180, 240, 0)`);
+            ctx.fillStyle = pulseGlow;
+            ctx.beginPath(); ctx.arc(ptx, pty, trailR, 0, Math.PI * 2); ctx.fill();
+          }
+          // Vesicle release burst near terminus
+          if (s.pulsePos > 0.92) {
+            const burstOp = (1 - (s.pulsePos - 0.92) / 0.08) * 0.4;
+            const [bx, by] = bezPt(from.x, from.y, cpx, cpy, to.x, to.y, 1);
+            for (let v = 0; v < 4; v++) {
+              const va = (v / 4) * Math.PI * 2 + nowS * 2;
+              const vr = 3 + (s.pulsePos - 0.92) / 0.08 * 8;
+              const vx = bx + Math.cos(va) * vr, vy = by + Math.sin(va) * vr;
+              ctx.fillStyle = `rgba(160, 210, 255, ${burstOp})`;
+              ctx.beginPath(); ctx.arc(vx, vy, 1.2, 0, Math.PI * 2); ctx.fill();
+            }
+          }
+        }
+
+        // Forming animation: dual-extend from both ends with flash at meeting point
+        if (s.forming && s.formProgress > 0 && s.formProgress < 1) {
+          const meetT = 0.5;
+          const progressFromStart = Math.min(meetT, s.formProgress * 1.2);
+          const progressFromEnd = Math.min(meetT, s.formProgress * 1.2);
+          // Growing tip from start
+          const [gx1, gy1] = bezPt(from.x, from.y, cpx, cpy, to.x, to.y, progressFromStart);
+          ctx.fillStyle = `rgba(180, 200, 255, ${0.5 * s.formProgress})`;
+          ctx.beginPath(); ctx.arc(gx1, gy1, 2, 0, Math.PI * 2); ctx.fill();
+          // Growing tip from end
+          const [gx2, gy2] = bezPt(from.x, from.y, cpx, cpy, to.x, to.y, 1 - progressFromEnd);
+          ctx.fillStyle = `rgba(180, 200, 255, ${0.5 * s.formProgress})`;
+          ctx.beginPath(); ctx.arc(gx2, gy2, 2, 0, Math.PI * 2); ctx.fill();
+          // Flash at meeting point when nearly complete
+          if (s.formProgress > 0.85) {
+            const flashOp = (s.formProgress - 0.85) / 0.15 * 0.5;
+            const [fmx, fmy] = bezPt(from.x, from.y, cpx, cpy, to.x, to.y, meetT);
+            const flashGrad = ctx.createRadialGradient(fmx, fmy, 0, fmx, fmy, 12);
+            flashGrad.addColorStop(0, `rgba(220, 230, 255, ${flashOp})`);
+            flashGrad.addColorStop(1, `rgba(180, 200, 255, 0)`);
+            ctx.fillStyle = flashGrad;
+            ctx.beginPath(); ctx.arc(fmx, fmy, 12, 0, Math.PI * 2); ctx.fill();
+          }
         }
       }
 
-      // ── Layer 5: Neuron cell bodies (soma) ──
+      // ── Layer 5: Neuron soma — multi-pass bloom, chromatic aberration, Airy ring ──
       for (const n of st.neurons) {
-        const pulse = Math.sin(n.pulsePhase) * 0.08 + 0.92;
-        const r = (12 + 6 * pulse) * n.maturity; // 12-18px radius, maturity-dependent
+        // Noise-modulated breathing (unique per neuron, irregular rhythm)
+        const noisePulse = noise2D(n.id * 7.3, nowS * 0.4) * 0.1 + 0.9;
+        const r = (12 + 6 * noisePulse) * n.maturity;
         const fire = n.fireLevel;
-        const energy = n.energy;
 
-        // Soma as layered radial gradients (fluorescence microscopy style)
+        // ── Pass 1: Outer PSF bloom (wide, faint — chromatic aberration: slight offset) ──
+        const bloomR = r * 3;
+        const abOff = 1.5; // chromatic aberration offset
+        // Blue-shifted halo (offset left)
+        const bloomB = ctx.createRadialGradient(n.x - abOff, n.y, r * 0.8, n.x - abOff, n.y, bloomR);
+        bloomB.addColorStop(0, `rgba(100, 120, 240, ${0.08 * (0.5 + fire * 0.3) * n.maturity})`);
+        bloomB.addColorStop(1, `rgba(100, 120, 240, 0)`);
+        ctx.fillStyle = bloomB;
+        ctx.beginPath(); ctx.arc(n.x - abOff, n.y, bloomR, 0, Math.PI * 2); ctx.fill();
+        // Violet halo (offset right)
+        const bloomV = ctx.createRadialGradient(n.x + abOff, n.y, r * 0.8, n.x + abOff, n.y, bloomR * 0.9);
+        bloomV.addColorStop(0, `rgba(160, 120, 220, ${0.06 * (0.5 + fire * 0.3) * n.maturity})`);
+        bloomV.addColorStop(1, `rgba(160, 120, 220, 0)`);
+        ctx.fillStyle = bloomV;
+        ctx.beginPath(); ctx.arc(n.x + abOff, n.y, bloomR * 0.9, 0, Math.PI * 2); ctx.fill();
+
+        // ── Airy ring hint (faint diffraction ring at ~2x soma radius) ──
+        const airyR = r * 2.2;
+        ctx.strokeStyle = `rgba(150, 140, 230, ${0.04 * n.maturity})`;
+        ctx.lineWidth = 0.8;
+        ctx.beginPath(); ctx.arc(n.x, n.y, airyR, 0, Math.PI * 2); ctx.stroke();
+
+        // ── Pass 2: Soma body (membrane → cytoplasm → center) ──
         const somaGrad = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, r);
-        // Outer membrane: bright violet-indigo ring (the fluorescent membrane)
-        somaGrad.addColorStop(0, `rgba(180, 160, 240, ${(0.6 + fire * 0.3) * n.maturity})`);
-        // Cytoplasm: semi-transparent, slightly dimmer
-        somaGrad.addColorStop(0.6, `rgba(140, 120, 220, ${(0.4 + fire * 0.25) * n.maturity})`);
-        // Center fades to background
+        // Firing: shift toward warm white-pink
+        const fireR = Math.round(180 + fire * 40); // 180→220
+        const fireG = Math.round(160 + fire * 40); // 160→200
+        const fireBlue = Math.round(240 - fire * 10); // 240→230
+        somaGrad.addColorStop(0, `rgba(${fireR}, ${fireG}, ${fireBlue}, ${(0.65 + fire * 0.3) * n.maturity})`);
+        somaGrad.addColorStop(0.55, `rgba(${fireR - 30}, ${fireG - 30}, ${Math.max(0, fireBlue - 20)}, ${(0.4 + fire * 0.2) * n.maturity})`);
         somaGrad.addColorStop(1, `rgba(100, 80, 180, 0)`);
         ctx.fillStyle = somaGrad;
         ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, Math.PI * 2); ctx.fill();
 
-        // Nucleus: smaller, brighter circle in center (more blue-white)
+        // ── Internal organelle texture (membrane blobs) ──
+        if (n.membraneBlobs) {
+          for (const blob of n.membraneBlobs) {
+            const blobX = n.x + blob.dx * r;
+            const blobY = n.y + blob.dy * r;
+            const blobR = blob.size * r;
+            ctx.fillStyle = `rgba(200, 180, 255, ${blob.opacity * n.maturity * (0.7 + fire * 0.3)})`;
+            ctx.beginPath(); ctx.arc(blobX, blobY, Math.max(0.5, blobR), 0, Math.PI * 2); ctx.fill();
+          }
+        }
+
+        // ── Pass 3: Nucleus (bright blue-white center) ──
         const nucR = r * 0.35;
         const nucGrad = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, nucR);
-        nucGrad.addColorStop(0, `rgba(210, 200, 255, ${(0.7 + fire * 0.2) * n.maturity})`);
-        nucGrad.addColorStop(0.6, `rgba(180, 170, 240, ${0.3 * n.maturity})`);
+        nucGrad.addColorStop(0, `rgba(${210 + fire * 30}, ${200 + fire * 40}, 255, ${(0.75 + fire * 0.2) * n.maturity})`);
+        nucGrad.addColorStop(0.6, `rgba(180, 170, 245, ${0.3 * n.maturity})`);
         nucGrad.addColorStop(1, `rgba(0, 0, 0, 0)`);
         ctx.fillStyle = nucGrad;
         ctx.beginPath(); ctx.arc(n.x, n.y, nucR, 0, Math.PI * 2); ctx.fill();
 
-        // Soft bloom/halo around cell body (PSF artifact, 2-3x the cell radius)
-        const bloomR = r * 2.5;
-        const bloomGrad = ctx.createRadialGradient(n.x, n.y, r, n.x, n.y, bloomR);
-        bloomGrad.addColorStop(0, `rgba(140, 120, 220, ${0.15 * (0.4 + fire * 0.2) * n.maturity})`);
-        bloomGrad.addColorStop(1, `rgba(140, 120, 220, 0)`);
-        ctx.fillStyle = bloomGrad;
-        ctx.beginPath(); ctx.arc(n.x, n.y, bloomR, 0, Math.PI * 2); ctx.fill();
-
-        // When firing: soma brightness wave increases
-        if (fire > 0.1) {
-          const fireGrad = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, r * 1.5);
-          fireGrad.addColorStop(0, `rgba(220, 200, 255, ${fire * 0.3 * n.maturity})`);
-          fireGrad.addColorStop(1, `rgba(200, 180, 240, 0)`);
+        // ── Firing bloom cascade: expanding ring that fades over ~500ms ──
+        if (fire > 0.08) {
+          const cascadeR = r * (1.5 + fire * 2); // expands with fire intensity
+          const fireGrad = ctx.createRadialGradient(n.x, n.y, r * 0.3, n.x, n.y, cascadeR);
+          // Warm shift during firing (white-pink)
+          fireGrad.addColorStop(0, `rgba(240, 220, 255, ${fire * 0.35 * n.maturity})`);
+          fireGrad.addColorStop(0.5, `rgba(200, 180, 250, ${fire * 0.15 * n.maturity})`);
+          fireGrad.addColorStop(1, `rgba(160, 140, 230, 0)`);
           ctx.fillStyle = fireGrad;
-          ctx.beginPath(); ctx.arc(n.x, n.y, r * 1.5, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.arc(n.x, n.y, cascadeR, 0, Math.PI * 2); ctx.fill();
         }
       }
 
-      // ── Layer 6: Ambient gentle firing on non-session screens ──
+      // ── Layer 6: Ambient firing — exponential inter-fire intervals ──
       if (!isSessionScreen && st.neurons.length > 0) {
-        if (!ambientFireTimerRef.current) ambientFireTimerRef.current = 0;
-        ambientFireTimerRef.current += 1 / 60;
-        const ambientInterval = 8 + Math.random() * 7; // 8-15 seconds
-        if (ambientFireTimerRef.current >= ambientInterval) {
+        if (typeof ambientFireTimerRef.current !== 'object') {
+          ambientFireTimerRef.current = { elapsed: 0, nextAt: -Math.log(1 - Math.random()) * 10 };
+        }
+        const aft = ambientFireTimerRef.current;
+        aft.elapsed += 1 / 60;
+        if (aft.elapsed >= aft.nextAt) {
           const n = st.neurons[Math.floor(Math.random() * st.neurons.length)];
           fireNeuron(st, n, synapseMap, ripplesRef, growthParticlesRef);
-          ambientFireTimerRef.current = 0;
+          aft.elapsed = 0;
+          aft.nextAt = -Math.log(1 - Math.random()) * 10; // exponential distribution, mean ~10s
         }
       }
 
-      // ── Layer 7: Vignette (subtle darkening at edges) ──
-      const vignetteGrad = ctx.createRadialGradient(w / 2, h / 2, Math.max(w, h) * 0.3, w / 2, h / 2, Math.max(w, h) * 0.9);
+      // ── Shockwave ripples ──
+      for (const rp of ripplesRef.current) {
+        ctx.strokeStyle = `rgba(170, 180, 255, ${rp.opacity * 0.6})`;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(rp.x, rp.y, rp.radius, 0, Math.PI * 2); ctx.stroke();
+      }
+
+      // ── Growth celebration particles ──
+      for (const gp of growthParticlesRef.current) {
+        const gpOp = gp.life * 0.7;
+        ctx.fillStyle = `rgba(180, 200, 255, ${gpOp})`;
+        ctx.beginPath(); ctx.arc(gp.x, gp.y, Math.max(0.3, gp.size * gp.life), 0, Math.PI * 2); ctx.fill();
+      }
+
+      // ── Layer 7: Deep vignette + microscope objective hint ──
+      const vigR = Math.max(w, h);
+      const vignetteGrad = ctx.createRadialGradient(w / 2, h / 2, vigR * 0.25, w / 2, h / 2, vigR * 0.85);
       vignetteGrad.addColorStop(0, `rgba(0, 0, 0, 0)`);
-      vignetteGrad.addColorStop(1, `rgba(0, 0, 0, 0.08)`);
+      vignetteGrad.addColorStop(0.7, `rgba(0, 0, 0, 0.06)`);
+      vignetteGrad.addColorStop(1, `rgba(0, 0, 0, 0.18)`);
       ctx.fillStyle = vignetteGrad;
       ctx.fillRect(0, 0, w, h);
+      // Faint microscope objective lens border
+      const objR = Math.min(w, h) * 0.85;
+      ctx.strokeStyle = `rgba(100, 90, 140, 0.03)`;
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(w / 2, h / 2, objR / 2, 0, Math.PI * 2); ctx.stroke();
 
-      // ── Layer 8: Dust particles (tiny bright specks, very low opacity) ──
-      for (let i = 0; i < 20; i++) {
-        const px = (w * (i * 0.618 + Math.sin(now * 0.0001 + i) * 0.1)) % w;
-        const py = (h * (i * 0.382 + Math.cos(now * 0.00015 + i) * 0.1)) % h;
-        const dustOp = 0.05 + Math.sin(now * 0.001 + i) * 0.02;
-        ctx.fillStyle = `rgba(200, 190, 240, ${dustOp})`;
-        ctx.beginPath(); ctx.arc(px, py, 1, 0, Math.PI * 2); ctx.fill();
+      // ── Layer 8: Sensor noise + subtle scan lines (scientific authenticity) ──
+      // Shot noise: sparse random dots (cheap — just 150 dots)
+      const noiseOp = 0.015;
+      ctx.fillStyle = `rgba(180, 170, 210, ${noiseOp})`;
+      for (let i = 0; i < 150; i++) {
+        // Use fast pseudo-random from shimmer timer for varying positions each frame
+        const seed = shimmerTimerRef.current * 17 + i * 131;
+        const nx2 = ((seed * 2654435761) >>> 0) / 4294967296 * w;
+        const ny2 = ((seed * 2246822519) >>> 0) / 4294967296 * h;
+        ctx.fillRect(nx2, ny2, 1, 1);
+      }
+      // Scan lines (every 4px, extremely subtle)
+      ctx.strokeStyle = `rgba(100, 90, 130, 0.008)`;
+      ctx.lineWidth = 0.5;
+      for (let y = 0; y < h; y += 4) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
       }
 
       animRef.current = requestAnimationFrame(loop);
@@ -2837,7 +3103,7 @@ function RenewInner() {
             position: "fixed", bottom: 4, right: 8,
             fontSize: 8, color: "#222", fontFamily: "monospace",
             pointerEvents: "none", zIndex: 9999,
-          }}>v2026.04.03e</div>
+          }}>v2026.04.03f</div>
         </div>
       );
     }
