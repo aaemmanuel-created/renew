@@ -861,6 +861,10 @@ function RenewInner() {
   const growthParticlesRef = useRef([]); // Birth/growth celebration particles
   const freqDataRef = useRef(null);   // Raw frequency data for waveform ring
   const shimmerTimerRef = useRef(0);  // Mature network shimmer timer
+  const fireTimerRef = useRef(0);     // Neuron firing interval timer
+  const dendriteTimerRef = useRef(0); // New dendrite sprouting timer
+  const neuronTimerRef = useRef(0);   // New neuron spawning timer
+  const ambientFireTimerRef = useRef(0); // Ambient firing on non-session screens
   const toneRef = useRef(null);
   const sessionStartRef = useRef({ neurons: 0, synapses: 0, dendrites: 0, speakTime: 0 });
   const lastGrowthRef = useRef(null);
@@ -1430,14 +1434,50 @@ function RenewInner() {
         } catch {}
       }
 
-      // ── Animation disabled — only track speaking time, no neuron growth ──
+      // ── Speaking time tracking & ultra-slow growth ──
       const isSessionScreen = screen === "session";
 
       if (spk && isSessionScreen) {
         speakAccRef.current += 1 / 60; st.totalSpeakTime += 1 / 60;
         const newTime = Math.floor(st.totalSpeakTime);
         if (newTime !== totalTime) setTotalTime(newTime);
-        // Animation disabled — neuron firing, dendrite growth, neuron spawning removed
+
+        // Ultra-slow dendrite extension: ~0.3px per second → 80px target takes ~4.5 minutes
+        for (const n of st.neurons) {
+          for (const d of n.dendrites) {
+            if (d.targetLength && d.length < d.targetLength) {
+              d.length = Math.min(d.targetLength, d.length + 0.005); // ultra-slow growth
+            }
+          }
+        }
+
+        // Neuron firing: every 3-5 seconds, responsive to volume
+        if (!fireTimerRef.current) fireTimerRef.current = 0;
+        fireTimerRef.current += 1 / 60;
+        const fireInterval = 3 + (1 - vol) * 2; // 3-5 seconds depending on volume
+        if (fireTimerRef.current >= fireInterval && st.neurons.length > 0) {
+          const n = st.neurons[Math.floor(Math.random() * st.neurons.length)];
+          fireNeuron(st, n, synapseMap, ripplesRef, growthParticlesRef);
+          fireTimerRef.current = 0;
+        }
+
+        // New dendrite sprouting: ~1 every 45-60 seconds
+        if (!dendriteTimerRef.current) dendriteTimerRef.current = 0;
+        dendriteTimerRef.current += 1 / 60;
+        if (dendriteTimerRef.current >= 45 + Math.random() * 15 && st.neurons.length > 0) {
+          const rn = st.neurons[Math.floor(Math.random() * st.neurons.length)];
+          growDendrite(rn);
+          dendriteTimerRef.current = 0;
+        }
+
+        // New neuron spawning: 1 every 90-120 seconds of accumulated speaking
+        if (!neuronTimerRef.current) neuronTimerRef.current = 0;
+        neuronTimerRef.current += 1 / 60;
+        if (neuronTimerRef.current >= 90 + Math.random() * 30 && st.neurons.length < 50) {
+          addNeuron(st, w, h, sessionPillar, growthParticlesRef);
+          setNeuronCount(st.neurons.length); setSynapseCount(st.synapses.length);
+          neuronTimerRef.current = 0;
+        }
       }
 
       // Global heartbeat rhythm — slow in silence, quickens with voice
@@ -1560,349 +1600,213 @@ function RenewInner() {
       }
 
       // ═══════════════════════════════════════════════════════════
-      // ─── RENDER ───
-      // Animation removed — black void on ALL screens until rebuild
+      // ─── RENDER: Fluorescence Microscopy Style ───
       // ═══════════════════════════════════════════════════════════
-
+      // ── Layer 1: Pure black background ──
       ctx.fillStyle = "#000000";
       ctx.fillRect(0, 0, w, h);
-      animRef.current = requestAnimationFrame(loop);
-      return;
 
-      // ── DISABLED: All layers below are dormant until animation rebuild ──
-      const trailAlpha = 0.15;
-      ctx.fillStyle = `rgba(0, 0, 0, ${trailAlpha})`;
-      ctx.fillRect(0, 0, w, h);
-
-      // ── Layer 1: Fixed background starfield (tiny 1px dots) ──
-      // Rendered with very low opacity, twinkle via shimmer timer
-      if (shimmerTimerRef.current % 3 === 0) { // only redraw every 3rd frame for perf
-        for (let i = 0; i < 80; i++) {
-          // Deterministic positions based on index (pseudo-random but stable)
-          const sx = ((i * 7919 + 104729) % 10007) / 10007 * w;
-          const sy = ((i * 6271 + 88651) % 10007) / 10007 * h;
-          const twinkle = Math.sin(shimmerTimerRef.current * 0.02 + i * 1.7) * 0.5 + 0.5;
-          const starOp = 0.08 + twinkle * 0.15;
-          ctx.fillStyle = `rgba(200, 210, 255, ${starOp})`;
-          ctx.fillRect(sx, sy, 1, 1);
-        }
+      // ── Layer 2: Very subtle dark blue-violet noise/fog (barely visible) ──
+      // Faint out-of-focus bokeh blobs drifting slowly
+      const bokehCount = 12;
+      for (let i = 0; i < bokehCount; i++) {
+        const bokehX = (w * (i * 0.618 + Math.sin(breathPhaseRef.current * 0.2 + i) * 0.15)) % w;
+        const bokehY = (h * (i * 0.382 + Math.cos(breathPhaseRef.current * 0.15 + i) * 0.12)) % h;
+        const bokehR = 40 + Math.sin(breathPhaseRef.current * 0.1 + i) * 20;
+        const bokehGrad = ctx.createRadialGradient(bokehX, bokehY, 0, bokehX, bokehY, bokehR);
+        bokehGrad.addColorStop(0, `rgba(80, 60, 120, 0.035)`);
+        bokehGrad.addColorStop(0.5, `rgba(100, 80, 140, 0.015)`);
+        bokehGrad.addColorStop(1, `rgba(0, 0, 0, 0)`);
+        ctx.fillStyle = bokehGrad;
+        ctx.beginPath(); ctx.arc(bokehX, bokehY, bokehR, 0, Math.PI * 2); ctx.fill();
       }
 
-      // ── Layer 2: Nebula gas clouds — soft, large, colored circles ──
-      // Voice volume controls nebula intensity and churning
-      const nebulaIntensity = isSessionScreen && spk ? 0.015 + vol * 0.035 : 0.006;
-      const nebulaPhase = breathPhaseRef.current * 0.3;
-      // 3-4 nebula clouds that shift with breathing
-      const nebulaClouds = [
-        { cx: w * 0.35 + Math.sin(nebulaPhase) * 20, cy: h * 0.4 + Math.cos(nebulaPhase * 0.7) * 15, r: Math.max(w, h) * 0.35, color: spc.fogRGB },
-        { cx: w * 0.65 + Math.cos(nebulaPhase * 0.8) * 25, cy: h * 0.55 + Math.sin(nebulaPhase * 0.6) * 18, r: Math.max(w, h) * 0.3, color: spc.deepRGB },
-        { cx: w * 0.5 + Math.sin(nebulaPhase * 1.1) * 15, cy: h * 0.3 + Math.cos(nebulaPhase * 0.9) * 12, r: Math.max(w, h) * 0.25, color: `rgba(120, 80, 180, ` },
-      ];
-      for (const nc of nebulaClouds) {
-        const ng = ctx.createRadialGradient(nc.cx, nc.cy, 0, nc.cx, nc.cy, nc.r);
-        ng.addColorStop(0, `${nc.color}${nebulaIntensity * 1.2})`);
-        ng.addColorStop(0.3, `${nc.color}${nebulaIntensity * 0.7})`);
-        ng.addColorStop(0.6, `${nc.color}${nebulaIntensity * 0.25})`);
-        ng.addColorStop(1, `${nc.color}0)`);
-        ctx.fillStyle = ng;
-        ctx.beginPath(); ctx.arc(nc.cx, nc.cy, nc.r, 0, Math.PI * 2); ctx.fill();
-      }
-      // Extra: warm nebula core when speaking — creation energy
-      if (isSessionScreen && spk && vol > 0.1) {
-        const coreG = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.min(w, h) * 0.3);
-        const coreOp = vol * 0.025;
-        coreG.addColorStop(0, `rgba(255, 200, 100, ${coreOp})`);
-        coreG.addColorStop(0.4, `rgba(200, 120, 60, ${coreOp * 0.4})`);
-        coreG.addColorStop(1, `rgba(0, 0, 0, 0)`);
-        ctx.fillStyle = coreG;
-        ctx.fillRect(0, 0, w, h);
-      }
+      // ── Layer 3: Dendrites (tapered lines with growth cones & spines) ──
+      for (const n of st.neurons) {
+        for (const d of n.dendrites) {
+          if (d.length < 0.5) continue;
+          const tipX = n.x + Math.cos(d.angle) * d.length;
+          const tipY = n.y + Math.sin(d.angle) * d.length;
+          const cp1x = n.x + Math.cos(d.angle) * d.length * 0.35 + d.curve1;
+          const cp1y = n.y + Math.sin(d.angle) * d.length * 0.35 + d.curve2;
 
-      // ── Layer 3: Cosmic dust particles (swirling nebula matter) ──
-      if (particlesRef.current) {
-        for (const p of particlesRef.current) {
-          const pulseFade = Math.sin(p.phase) * 0.5 + 0.5;
-          const depthScale = 0.3 + p.depth * 0.7;
-          const pOp = p.opacity * (0.6 + pulseFade * 0.4) * depthScale;
-          const pSize = p.size * depthScale;
-          if (p.depth < 0.5) {
-            // Far dust: simple dim dots — blue-tinted
-            ctx.fillStyle = `rgba(140, 160, 220, ${pOp * 0.6})`;
-            ctx.beginPath(); ctx.arc(p.x, p.y, pSize * 0.8, 0, Math.PI * 2); ctx.fill();
-          } else {
-            // Near dust: brighter, slightly larger with glow
-            const dg = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, pSize * 2);
-            dg.addColorStop(0, `${spc.brightRGB}${pOp * 0.8})`);
-            dg.addColorStop(0.5, `${spc.fogRGB}${pOp * 0.3})`);
-            dg.addColorStop(1, `${spc.deepRGB}0)`);
-            ctx.fillStyle = dg;
-            ctx.beginPath(); ctx.arc(p.x, p.y, pSize * 2, 0, Math.PI * 2); ctx.fill();
+          // Main dendrite as segmented tapered line (violet/indigo)
+          const dSegs = 12;
+          for (let i = 0; i < dSegs; i++) {
+            const t0 = i / dSegs, t1 = (i + 1) / dSegs;
+            const [x0, y0] = bezPt(n.x, n.y, cp1x, cp1y, tipX, tipY, t0);
+            const [x1, y1] = bezPt(n.x, n.y, cp1x, cp1y, tipX, tipY, t1);
+            const tMid = (t0 + t1) / 2;
+            // Taper from 2.5px at soma to 0.5px at tip
+            const tWidth = 2.5 * (1 - tMid * 0.8) * n.maturity;
+            const fireBoost = n.fireLevel * 0.5;
+            const opacity = (0.4 + fireBoost * 0.3) * n.maturity;
+            // Sharp violet dendrite
+            ctx.strokeStyle = `rgba(140, 120, 220, ${opacity})`;
+            ctx.lineWidth = Math.max(0.5, tWidth);
+            ctx.lineCap = "round";
+            ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+            // Glow/bloom effect (wider, lower opacity)
+            ctx.strokeStyle = `rgba(160, 140, 230, ${opacity * 0.25})`;
+            ctx.lineWidth = Math.max(0.5, tWidth * 2.5);
+            ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
           }
-        }
-      }
 
-      // ── Layer 4: Shockwave rings (from stellar ignition) ──
-      for (const rp of ripplesRef.current) {
-        const rc = getPillarCached(rp.pillar);
-        const progress = rp.radius / rp.maxRadius;
-        // Shockwave ring — bright leading edge that fades
-        ctx.strokeStyle = `${rc.brightRGB}${rp.opacity * 0.5 * (1 - progress)})`;
-        ctx.lineWidth = 2 * (1 - progress) + 0.5;
-        ctx.beginPath(); ctx.arc(rp.x, rp.y, rp.radius, 0, Math.PI * 2); ctx.stroke();
-        // Expanding hot gas fill behind the shockwave
-        const swGlow = ctx.createRadialGradient(rp.x, rp.y, rp.radius * 0.6, rp.x, rp.y, rp.radius);
-        swGlow.addColorStop(0, `${rc.fogRGB}0)`);
-        swGlow.addColorStop(0.7, `${rc.fireRGB}${rp.opacity * 0.04})`);
-        swGlow.addColorStop(1, `${rc.brightRGB}${rp.opacity * 0.06})`);
-        ctx.fillStyle = swGlow;
-        ctx.beginPath(); ctx.arc(rp.x, rp.y, rp.radius, 0, Math.PI * 2); ctx.fill();
-        // Push nearby particles outward (visual only — nudge velocities)
-        if (particlesRef.current && progress < 0.3) {
-          for (const p of particlesRef.current) {
-            const pdx = p.x - rp.x, pdy = p.y - rp.y;
-            const pd = Math.sqrt(pdx * pdx + pdy * pdy);
-            if (pd < rp.radius + 20 && pd > rp.radius - 20 && pd > 1) {
-              p.vx += (pdx / pd) * 0.3 * rp.opacity;
-              p.vy += (pdy / pd) * 0.3 * rp.opacity;
+          // Dendritic spines: tiny dots along the dendrite
+          const spineCount = Math.ceil(d.length / 20);
+          for (let i = 0; i < spineCount; i++) {
+            const spt = (i + Math.sin(now * 0.001 + i) * 0.2) / spineCount;
+            if (spt >= 0 && spt <= 1) {
+              const [sx, sy] = bezPt(n.x, n.y, cp1x, cp1y, tipX, tipY, spt);
+              const spineOp = (0.3 + n.fireLevel * 0.4) * n.maturity;
+              ctx.fillStyle = `rgba(160, 130, 240, ${spineOp})`;
+              ctx.beginPath(); ctx.arc(sx, sy, 1.5, 0, Math.PI * 2); ctx.fill();
             }
           }
+
+          // Growth cone with filopodia at the tip
+          const gc_size = 8;
+          const gc_x = tipX, gc_y = tipY;
+          // Filopodia: 2-4 hair-thin lines extending past tip
+          const filCount = 2 + Math.floor(Math.random() * 3);
+          for (let f = 0; f < filCount; f++) {
+            const filAngle = d.angle + (Math.random() - 0.5) * 0.5;
+            const filLen = 5 + Math.random() * 10;
+            const filX = gc_x + Math.cos(filAngle) * filLen;
+            const filY = gc_y + Math.sin(filAngle) * filLen;
+            ctx.strokeStyle = `rgba(140, 120, 220, ${0.3 * n.maturity})`;
+            ctx.lineWidth = 0.3;
+            ctx.lineCap = "round";
+            ctx.beginPath(); ctx.moveTo(gc_x, gc_y); ctx.lineTo(filX, filY); ctx.stroke();
+          }
+          // Growth cone lamellipodium glow
+          const lamGrad = ctx.createRadialGradient(gc_x, gc_y, 0, gc_x, gc_y, 8);
+          lamGrad.addColorStop(0, `rgba(160, 140, 230, ${0.15 * n.maturity})`);
+          lamGrad.addColorStop(1, `rgba(140, 120, 220, 0)`);
+          ctx.fillStyle = lamGrad;
+          ctx.beginPath(); ctx.arc(gc_x, gc_y, 8, 0, Math.PI * 2); ctx.fill();
         }
       }
 
-      // ── Layer 5: Gravitational filaments (synapses as cosmic web) ──
+      // Draw synapses as connecting lines and puncta
       for (const s of st.synapses) {
         const from = neuronMap.get(s.from), to = neuronMap.get(s.to);
         if (!from || !to) continue;
-        const sc = getPillarCached(from.pillar);
-        const baseAlpha = 0.04 + s.strength * 0.25 + s.activity * 0.3;
-        const baseW = s.width * (1 + s.activity * 0.6);
         const mx = (from.x + to.x) / 2, my = (from.y + to.y) / 2;
         const cpx = mx + s.cx, cpy = my + s.cy;
         const drawEnd = s.forming ? s.formProgress : 1;
 
-        // Draw wispy filament — cosmic web connection
-        const segments = 8;
+        // Thin axon line connecting neurons
+        const segments = 6;
         for (let i = 0; i < segments; i++) {
           const t0 = i / segments, t1 = (i + 1) / segments;
           if (t0 >= drawEnd) break;
           const actualT1 = Math.min(t1, drawEnd);
           const [x0, y0] = bezPt(from.x, from.y, cpx, cpy, to.x, to.y, t0);
           const [x1, y1] = bezPt(from.x, from.y, cpx, cpy, to.x, to.y, actualT1);
-          const tMid = (t0 + actualT1) / 2;
-          const taperW = baseW * (s.taperStart * (1 - tMid) + s.taperEnd * tMid);
-          const segAlpha = baseAlpha * (0.6 + 0.4 * (1 - tMid * 0.5));
-          // Blue-purple tint for cosmic filaments
-          ctx.strokeStyle = s.activity > 0.1
-            ? `${sc.softRGB}${segAlpha})`
-            : `rgba(100, 120, 180, ${segAlpha * 0.3})`;
-          ctx.lineWidth = taperW;
+          const synapseOp = (0.2 + s.activity * 0.3) * (s.forming ? s.formProgress : 1);
+          ctx.strokeStyle = `rgba(120, 100, 200, ${synapseOp})`;
+          ctx.lineWidth = 1;
           ctx.lineCap = "round";
           ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
         }
 
-        // Glow halo along strong filaments
-        if (s.strength > 0.25 && !s.forming) {
-          ctx.strokeStyle = `${sc.fogRGB}${s.strength * 0.03 + s.activity * 0.04})`;
-          ctx.lineWidth = baseW * s.taperStart + 5;
-          ctx.lineCap = "round";
-          ctx.beginPath(); ctx.moveTo(from.x, from.y); ctx.quadraticCurveTo(cpx, cpy, to.x, to.y); ctx.stroke();
-        }
+        // Synaptic puncta (small bright dots at the synapse location)
+        const [px, py] = bezPt(from.x, from.y, cpx, cpy, to.x, to.y, 0.7);
+        const punctaOp = (0.5 + s.activity * 0.3) * (s.forming ? s.formProgress : 1);
+        // Sharp puncta center
+        ctx.fillStyle = `rgba(170, 180, 255, ${punctaOp})`;
+        ctx.beginPath(); ctx.arc(px, py, 2, 0, Math.PI * 2); ctx.fill();
+        // Puncta glow
+        const pGlow = ctx.createRadialGradient(px, py, 0, px, py, 6);
+        pGlow.addColorStop(0, `rgba(170, 180, 255, ${punctaOp * 0.5})`);
+        pGlow.addColorStop(1, `rgba(170, 180, 255, 0)`);
+        ctx.fillStyle = pGlow;
+        ctx.beginPath(); ctx.arc(px, py, 6, 0, Math.PI * 2); ctx.fill();
 
-        // Light pulse traveling along filament
+        // Synaptic pulse: bright dot traveling along synapse
         if (s.pulsePos >= 0 && s.pulsePos <= 1 && !s.forming) {
-          const [px, py] = bezPt(from.x, from.y, cpx, cpy, to.x, to.y, s.pulsePos);
-          const pg = ctx.createRadialGradient(px, py, 0, px, py, 12);
-          pg.addColorStop(0, `rgba(255, 240, 200, 0.35)`);
-          pg.addColorStop(0.3, `${sc.fireRGB}0.15)`);
-          pg.addColorStop(0.7, `${sc.fogRGB}0.04)`);
-          pg.addColorStop(1, `rgba(0, 0, 0, 0)`);
-          ctx.fillStyle = pg; ctx.beginPath(); ctx.arc(px, py, 12, 0, Math.PI * 2); ctx.fill();
-        }
-
-        // Forming filament tip glow
-        if (s.forming) {
-          const [tipX, tipY] = bezPt(from.x, from.y, cpx, cpy, to.x, to.y, s.formProgress);
-          const fi = 1 - s.formProgress * 0.6;
-          const tipR = 6 + (1 - s.formProgress) * 6;
-          const tg = ctx.createRadialGradient(tipX, tipY, 0, tipX, tipY, tipR);
-          tg.addColorStop(0, `rgba(255, 250, 230, ${0.35 * fi})`);
-          tg.addColorStop(0.3, `${sc.brightRGB}${0.3 * fi})`);
-          tg.addColorStop(1, `${sc.fogRGB}0)`);
-          ctx.fillStyle = tg; ctx.beginPath(); ctx.arc(tipX, tipY, tipR, 0, Math.PI * 2); ctx.fill();
+          const [ppx, ppy] = bezPt(from.x, from.y, cpx, cpy, to.x, to.y, s.pulsePos);
+          const pulseGlow = ctx.createRadialGradient(ppx, ppy, 0, ppx, ppy, 10);
+          pulseGlow.addColorStop(0, `rgba(200, 210, 255, 0.6)`);
+          pulseGlow.addColorStop(0.6, `rgba(170, 180, 255, 0.2)`);
+          pulseGlow.addColorStop(1, `rgba(170, 180, 255, 0)`);
+          ctx.fillStyle = pulseGlow;
+          ctx.beginPath(); ctx.arc(ppx, ppy, 10, 0, Math.PI * 2); ctx.fill();
         }
       }
 
-      // ── Layer 6: Stars (neurons as stellar bodies) ──
+      // ── Layer 5: Neuron cell bodies (soma) ──
       for (const n of st.neurons) {
-        const pc = getPillarCached(n.pillar);
         const pulse = Math.sin(n.pulsePhase) * 0.08 + 0.92;
-        const r = n.radius * n.maturity * pulse;
-        // Star twinkling — random brightness fluctuation
-        let fire = n.fireLevel;
-        if (shimmerTimerRef.current % 45 === n.id % 45) {
-          fire = Math.max(fire, 0.1 + Math.random() * 0.2);
-        }
+        const r = (12 + 6 * pulse) * n.maturity; // 12-18px radius, maturity-dependent
+        const fire = n.fireLevel;
         const energy = n.energy;
-        const breathMod = 1 + breath * 0.15;
-        const lum = 0.5 + energy * 0.5;
 
-        // ── Stellar corona / gravitational arms (dendrites as dim radial filaments) ──
-        for (const d of n.dendrites) {
-          if (d.length < 0.5) continue;
-          const baseAlpha = (0.06 + energy * 0.12 + fire * 0.1) * n.maturity;
-          const axonBoost = d.isAxon ? 1.2 : 1;
-          const tipX = n.x + Math.cos(d.angle) * d.length;
-          const tipY = n.y + Math.sin(d.angle) * d.length;
-          const cp1x = n.x + Math.cos(d.angle) * d.length * 0.35 + d.curve1;
-          const cp1y = n.y + Math.sin(d.angle) * d.length * 0.35 + d.curve2;
+        // Soma as layered radial gradients (fluorescence microscopy style)
+        const somaGrad = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, r);
+        // Outer membrane: bright violet-indigo ring (the fluorescent membrane)
+        somaGrad.addColorStop(0, `rgba(180, 160, 240, ${(0.6 + fire * 0.3) * n.maturity})`);
+        // Cytoplasm: semi-transparent, slightly dimmer
+        somaGrad.addColorStop(0.6, `rgba(140, 120, 220, ${(0.4 + fire * 0.25) * n.maturity})`);
+        // Center fades to background
+        somaGrad.addColorStop(1, `rgba(100, 80, 180, 0)`);
+        ctx.fillStyle = somaGrad;
+        ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, Math.PI * 2); ctx.fill();
 
-          // Dim wispy filament glow
-          ctx.strokeStyle = `rgba(120, 140, 200, ${baseAlpha * 0.1 * axonBoost})`;
-          ctx.lineWidth = (d.width * n.maturity + 2) * axonBoost;
-          ctx.lineCap = "round";
-          ctx.beginPath(); ctx.moveTo(n.x, n.y); ctx.quadraticCurveTo(cp1x, cp1y, tipX, tipY); ctx.stroke();
-
-          // Main filament — tapered
-          const dSegs = 6;
-          for (let i = 0; i < dSegs; i++) {
-            const t0 = i / dSegs, t1 = (i + 1) / dSegs;
-            const [x0, y0] = bezPt(n.x, n.y, cp1x, cp1y, tipX, tipY, t0);
-            const [x1, y1] = bezPt(n.x, n.y, cp1x, cp1y, tipX, tipY, t1);
-            const tMid = (t0 + t1) / 2;
-            const tWidth = d.width * n.maturity * axonBoost * (1 - tMid * 0.85);
-            const tAlpha = baseAlpha * axonBoost * (1 - tMid * 0.5);
-            ctx.strokeStyle = `rgba(140, 160, 220, ${tAlpha})`;
-            ctx.lineWidth = Math.max(0.2, tWidth);
-            ctx.lineCap = "round";
-            ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
-          }
-
-          // Sub-branches as faint dust filaments
-          for (const br of d.branches) {
-            const [brX, brY] = bezPt(n.x, n.y, cp1x, cp1y, tipX, tipY, br.t);
-            const brTipX = brX + Math.cos(br.angle) * br.length;
-            const brTipY = brY + Math.sin(br.angle) * br.length;
-            ctx.strokeStyle = `rgba(100, 120, 180, ${baseAlpha * 0.25})`;
-            ctx.lineWidth = Math.max(0.2, d.width * 0.3 * n.maturity);
-            ctx.lineCap = "round";
-            ctx.beginPath(); ctx.moveTo(brX, brY); ctx.lineTo(brTipX, brTipY); ctx.stroke();
-          }
-        }
-
-        // ── Wide stellar halo — the star's outer glow ──
-        const haloR = (r + 30 + fire * 50 + energy * 25) * breathMod;
-        const halo = ctx.createRadialGradient(n.x, n.y, r * 0.3, n.x, n.y, haloR);
-        if (fire > 0.15) {
-          // Firing: bright golden-white flash like stellar ignition
-          halo.addColorStop(0, `rgba(255, 245, 220, ${fire * 0.25 * lum})`);
-          halo.addColorStop(0.1, `${pc.brightRGB}${fire * 0.15 * lum})`);
-          halo.addColorStop(0.3, `${pc.fireRGB}${fire * 0.06})`);
-          halo.addColorStop(0.6, `${pc.fogRGB}${fire * 0.02})`);
-          halo.addColorStop(1, `rgba(0, 0, 0, 0)`);
-        } else {
-          // Resting: warm gentle stellar glow
-          halo.addColorStop(0, `${pc.brightRGB}${energy * 0.18 * lum})`);
-          halo.addColorStop(0.25, `${pc.softRGB}${energy * 0.08})`);
-          halo.addColorStop(0.6, `${pc.fogRGB}${energy * 0.02})`);
-          halo.addColorStop(1, `rgba(0, 0, 0, 0)`);
-        }
-        ctx.fillStyle = halo; ctx.beginPath(); ctx.arc(n.x, n.y, haloR, 0, Math.PI * 2); ctx.fill();
-
-        // ── Diffraction spikes (4-pointed star cross) — the signature stellar look ──
-        const spikeLen = (r * 2.5 + fire * 25 + energy * 10) * n.maturity;
-        const spikeOp = (0.08 + fire * 0.2 + energy * 0.06) * n.maturity * lum;
-        if (spikeLen > 3) {
-          ctx.strokeStyle = `rgba(220, 230, 255, ${spikeOp})`;
-          ctx.lineWidth = 0.8;
-          ctx.lineCap = "round";
-          // Vertical spike
-          ctx.beginPath(); ctx.moveTo(n.x, n.y - spikeLen); ctx.lineTo(n.x, n.y + spikeLen); ctx.stroke();
-          // Horizontal spike
-          ctx.beginPath(); ctx.moveTo(n.x - spikeLen, n.y); ctx.lineTo(n.x + spikeLen, n.y); ctx.stroke();
-          // Faint diagonal spikes (45°)
-          const diagLen = spikeLen * 0.5;
-          const diagOp = spikeOp * 0.4;
-          ctx.strokeStyle = `rgba(200, 210, 255, ${diagOp})`;
-          ctx.lineWidth = 0.5;
-          ctx.beginPath(); ctx.moveTo(n.x - diagLen * 0.707, n.y - diagLen * 0.707); ctx.lineTo(n.x + diagLen * 0.707, n.y + diagLen * 0.707); ctx.stroke();
-          ctx.beginPath(); ctx.moveTo(n.x + diagLen * 0.707, n.y - diagLen * 0.707); ctx.lineTo(n.x - diagLen * 0.707, n.y + diagLen * 0.707); ctx.stroke();
-        }
-
-        // ── Star core — bright white-hot center ──
-        const starGrad = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, r * 1.2);
-        if (fire > 0.2) {
-          // Stellar ignition — white-hot
-          starGrad.addColorStop(0, `rgba(255, 255, 252, ${Math.min(0.95, (0.7 + fire * 0.35)) * lum})`);
-          starGrad.addColorStop(0.2, `rgba(255, 240, 200, ${(0.5 + fire * 0.3) * lum})`);
-          starGrad.addColorStop(0.5, `${pc.fireRGB}${(0.2 + fire * 0.15) * lum})`);
-          starGrad.addColorStop(1, `${pc.fogRGB}${0.04 * lum})`);
-        } else {
-          // Resting star — warm golden
-          starGrad.addColorStop(0, `rgba(255, 248, 235, ${(0.4 + energy * 0.4) * lum})`);
-          starGrad.addColorStop(0.3, `${pc.brightRGB}${(0.25 + energy * 0.2) * lum})`);
-          starGrad.addColorStop(0.7, `${pc.dimRGB}${(0.06 + energy * 0.06) * lum})`);
-          starGrad.addColorStop(1, `rgba(0, 0, 0, 0)`);
-        }
-        ctx.fillStyle = starGrad;
-        ctx.beginPath(); ctx.arc(n.x, n.y, r * 1.2, 0, Math.PI * 2); ctx.fill();
-
-        // ── Hot nucleus pinpoint ──
-        const nucR = r * 0.3;
+        // Nucleus: smaller, brighter circle in center (more blue-white)
+        const nucR = r * 0.35;
         const nucGrad = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, nucR);
-        nucGrad.addColorStop(0, `rgba(255, 255, 255, ${(0.3 + fire * 0.5 + energy * 0.2) * n.maturity * lum})`);
-        nucGrad.addColorStop(0.6, `rgba(255, 240, 200, ${(0.1 + fire * 0.15) * n.maturity * lum})`);
+        nucGrad.addColorStop(0, `rgba(210, 200, 255, ${(0.7 + fire * 0.2) * n.maturity})`);
+        nucGrad.addColorStop(0.6, `rgba(180, 170, 240, ${0.3 * n.maturity})`);
         nucGrad.addColorStop(1, `rgba(0, 0, 0, 0)`);
-        ctx.fillStyle = nucGrad; ctx.beginPath(); ctx.arc(n.x, n.y, nucR, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = nucGrad;
+        ctx.beginPath(); ctx.arc(n.x, n.y, nucR, 0, Math.PI * 2); ctx.fill();
 
-        // ── Stellar ignition shockwave (new star birth) ──
-        if (n.maturity < 0.12) {
-          const birthPhase = n.maturity / 0.12;
-          const shockR = 20 + birthPhase * 60;
-          const shockOp = (1 - birthPhase) * 0.3;
-          // Bright expanding ring
-          ctx.strokeStyle = `rgba(255, 240, 200, ${shockOp})`;
-          ctx.lineWidth = 2 * (1 - birthPhase);
-          ctx.beginPath(); ctx.arc(n.x, n.y, shockR, 0, Math.PI * 2); ctx.stroke();
-          // Hot gas behind shockwave
-          const birthGlow = ctx.createRadialGradient(n.x, n.y, shockR * 0.3, n.x, n.y, shockR * 1.3);
-          birthGlow.addColorStop(0, `rgba(255, 200, 100, ${shockOp * 0.15})`);
-          birthGlow.addColorStop(0.5, `${pc.fireRGB}${shockOp * 0.08})`);
-          birthGlow.addColorStop(1, `rgba(0, 0, 0, 0)`);
-          ctx.fillStyle = birthGlow; ctx.beginPath(); ctx.arc(n.x, n.y, shockR * 1.3, 0, Math.PI * 2); ctx.fill();
+        // Soft bloom/halo around cell body (PSF artifact, 2-3x the cell radius)
+        const bloomR = r * 2.5;
+        const bloomGrad = ctx.createRadialGradient(n.x, n.y, r, n.x, n.y, bloomR);
+        bloomGrad.addColorStop(0, `rgba(140, 120, 220, ${0.15 * (0.4 + fire * 0.2) * n.maturity})`);
+        bloomGrad.addColorStop(1, `rgba(140, 120, 220, 0)`);
+        ctx.fillStyle = bloomGrad;
+        ctx.beginPath(); ctx.arc(n.x, n.y, bloomR, 0, Math.PI * 2); ctx.fill();
+
+        // When firing: soma brightness wave increases
+        if (fire > 0.1) {
+          const fireGrad = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, r * 1.5);
+          fireGrad.addColorStop(0, `rgba(220, 200, 255, ${fire * 0.3 * n.maturity})`);
+          fireGrad.addColorStop(1, `rgba(200, 180, 240, 0)`);
+          ctx.fillStyle = fireGrad;
+          ctx.beginPath(); ctx.arc(n.x, n.y, r * 1.5, 0, Math.PI * 2); ctx.fill();
         }
       }
 
-      // ── Layer 7: Stellar birth particles (sparks from ignition) ──
-      for (const gp of growthParticlesRef.current) {
-        const gc = getPillarCached(gp.pillar);
-        const gpOp = gp.life * 0.7;
-        const gpSize = gp.size * (0.8 + (1 - gp.life) * 0.3);
-        // Golden-white sparks
-        const gpGrad = ctx.createRadialGradient(gp.x, gp.y, 0, gp.x, gp.y, gpSize);
-        gpGrad.addColorStop(0, `rgba(255, 245, 200, ${gpOp})`);
-        gpGrad.addColorStop(0.5, `${gc.fireRGB}${gpOp * 0.4})`);
-        gpGrad.addColorStop(1, `rgba(0, 0, 0, 0)`);
-        ctx.fillStyle = gpGrad;
-        ctx.beginPath(); ctx.arc(gp.x, gp.y, gpSize, 0, Math.PI * 2); ctx.fill();
+      // ── Layer 6: Ambient gentle firing on non-session screens ──
+      if (!isSessionScreen && st.neurons.length > 0) {
+        if (!ambientFireTimerRef.current) ambientFireTimerRef.current = 0;
+        ambientFireTimerRef.current += 1 / 60;
+        const ambientInterval = 8 + Math.random() * 7; // 8-15 seconds
+        if (ambientFireTimerRef.current >= ambientInterval) {
+          const n = st.neurons[Math.floor(Math.random() * st.neurons.length)];
+          fireNeuron(st, n, synapseMap, ripplesRef, growthParticlesRef);
+          ambientFireTimerRef.current = 0;
+        }
       }
 
-      // ── Layer 8: Occasional shooting stars (fast bright streaks) ──
-      if (isSessionScreen && spk && Math.random() < 0.003 * vol) {
-        const ssX = Math.random() * w;
-        const ssY = Math.random() * h * 0.6;
-        const ssAngle = Math.PI * 0.15 + Math.random() * 0.3;
-        const ssLen = 30 + Math.random() * 50;
-        const ssGrad = ctx.createLinearGradient(ssX, ssY, ssX + Math.cos(ssAngle) * ssLen, ssY + Math.sin(ssAngle) * ssLen);
-        ssGrad.addColorStop(0, `rgba(255, 255, 255, 0.4)`);
-        ssGrad.addColorStop(0.3, `rgba(200, 220, 255, 0.2)`);
-        ssGrad.addColorStop(1, `rgba(0, 0, 0, 0)`);
-        ctx.strokeStyle = ssGrad;
-        ctx.lineWidth = 1;
-        ctx.lineCap = "round";
-        ctx.beginPath();
-        ctx.moveTo(ssX, ssY);
-        ctx.lineTo(ssX + Math.cos(ssAngle) * ssLen, ssY + Math.sin(ssAngle) * ssLen);
-        ctx.stroke();
+      // ── Layer 7: Vignette (subtle darkening at edges) ──
+      const vignetteGrad = ctx.createRadialGradient(w / 2, h / 2, Math.max(w, h) * 0.3, w / 2, h / 2, Math.max(w, h) * 0.9);
+      vignetteGrad.addColorStop(0, `rgba(0, 0, 0, 0)`);
+      vignetteGrad.addColorStop(1, `rgba(0, 0, 0, 0.08)`);
+      ctx.fillStyle = vignetteGrad;
+      ctx.fillRect(0, 0, w, h);
+
+      // ── Layer 8: Dust particles (tiny bright specks, very low opacity) ──
+      for (let i = 0; i < 20; i++) {
+        const px = (w * (i * 0.618 + Math.sin(now * 0.0001 + i) * 0.1)) % w;
+        const py = (h * (i * 0.382 + Math.cos(now * 0.00015 + i) * 0.1)) % h;
+        const dustOp = 0.05 + Math.sin(now * 0.001 + i) * 0.02;
+        ctx.fillStyle = `rgba(200, 190, 240, ${dustOp})`;
+        ctx.beginPath(); ctx.arc(px, py, 1, 0, Math.PI * 2); ctx.fill();
       }
 
       animRef.current = requestAnimationFrame(loop);
@@ -2874,7 +2778,7 @@ function RenewInner() {
             position: "fixed", bottom: 4, right: 8,
             fontSize: 8, color: "#222", fontFamily: "monospace",
             pointerEvents: "none", zIndex: 9999,
-          }}>v2026.04.03b</div>
+          }}>v2026.04.03c</div>
         </div>
       );
     }
