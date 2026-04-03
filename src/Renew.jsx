@@ -1430,65 +1430,14 @@ function RenewInner() {
         } catch {}
       }
 
-      // Gentle ambient firing on non-session screens (home/summary/history)
+      // ── Animation disabled — only track speaking time, no neuron growth ──
       const isSessionScreen = screen === "session";
-      if (!isSessionScreen && st.neurons.length > 1 && Math.random() < 0.005) {
-        const n = st.neurons[Math.floor(Math.random() * st.neurons.length)];
-        n.fireLevel = Math.min(1, n.fireLevel + 0.4);
-        for (const sid of n.connections) {
-          const syn = synapseMap.get(sid);
-          if (syn) { syn.activity = Math.min(1, syn.activity + 0.3); syn.pulsePos = syn.from === n.id ? 0 : 1; }
-        }
-      }
 
       if (spk && isSessionScreen) {
         speakAccRef.current += 1 / 60; st.totalSpeakTime += 1 / 60;
         const newTime = Math.floor(st.totalSpeakTime);
         if (newTime !== totalTime) setTotalTime(newTime);
-
-        // Fire neurons — every 1.5-3 seconds, responsive heartbeat
-        if (now - lastFireRef.current > Math.max(1500, 3000 - vol * 1500)) {
-          lastFireRef.current = now;
-          fireNeuron(st, st.neurons[Math.floor(Math.random() * st.neurons.length)], synapseMap, ripplesRef, growthParticlesRef);
-          // Sound: crystalline fire tone
-          if (toneRef.current) {
-            const notes = ["C5", "E5", "G5", "B5", "D6", "A5"];
-            const note = notes[Math.floor(Math.random() * notes.length)];
-            try { toneRef.current.fireSynth.triggerAttackRelease(note, "8n"); } catch {}
-          }
-        }
-
-        // Grow dendrites on neurons — a new neurite sprouts every ~4-8s of speaking
-        for (const neuron of st.neurons) {
-          if (Math.random() < 0.003 + vol * 0.002) { // ~once every 4-8s at normal volume
-            growDendrite(neuron);
-          }
-        }
-
-        // Spawn new neuron — requires 25-50+ seconds of accumulated speaking
-        const si = 25 + Math.min(st.neurons.length * 5, 25);
-        if (speakAccRef.current > si && st.neurons.length < 50) {
-          speakAccRef.current = 0; addNeuron(st, w, h, sessionPillar, growthParticlesRef);
-          setNeuronCount(st.neurons.length); setSynapseCount(st.synapses.length);
-          // Sound: deep spawn tone
-          if (toneRef.current) {
-            const notes = ["C3", "E3", "G3", "A3"];
-            const note = notes[Math.floor(Math.random() * notes.length)];
-            try { toneRef.current.spawnSynth.triggerAttackRelease(note, "2n"); } catch {}
-          }
-
-          // Form extra connections (30% chance) for richer network
-          if (Math.random() < 0.30) {
-            const a = st.neurons[Math.floor(Math.random() * st.neurons.length)];
-            for (const b of st.neurons) {
-              if (a.id !== b.id && dst(a, b) < 120 && !st.synapses.some(s => (s.from === a.id && s.to === b.id) || (s.from === b.id && s.to === a.id))) {
-                const sid = st.nextId++; const syn = new Synapse(a.id, b.id, sid);
-                st.synapses.push(syn); a.connections.push(sid); b.connections.push(sid);
-                setSynapseCount(st.synapses.length); break;
-              }
-            }
-          }
-        }
+        // Animation disabled — neuron firing, dendrite growth, neuron spawning removed
       }
 
       // Global heartbeat rhythm — slow in silence, quickens with voice
@@ -1612,17 +1561,15 @@ function RenewInner() {
 
       // ═══════════════════════════════════════════════════════════
       // ─── RENDER ───
+      // Animation removed — black void on ALL screens until rebuild
       // ═══════════════════════════════════════════════════════════
 
-      // Session screen: pure black void — no animation
-      if (isSessionScreen) {
-        ctx.fillStyle = "#000000";
-        ctx.fillRect(0, 0, w, h);
-        animRef.current = requestAnimationFrame(loop);
-        return;
-      }
+      ctx.fillStyle = "#000000";
+      ctx.fillRect(0, 0, w, h);
+      animRef.current = requestAnimationFrame(loop);
+      return;
 
-      // Non-session screens: gentle ambient background
+      // ── DISABLED: All layers below are dormant until animation rebuild ──
       const trailAlpha = 0.15;
       ctx.fillStyle = `rgba(0, 0, 0, ${trailAlpha})`;
       ctx.fillRect(0, 0, w, h);
@@ -2927,7 +2874,7 @@ function RenewInner() {
             position: "fixed", bottom: 4, right: 8,
             fontSize: 8, color: "#222", fontFamily: "monospace",
             pointerEvents: "none", zIndex: 9999,
-          }}>v2026.04.03a</div>
+          }}>v2026.04.03b</div>
         </div>
       );
     }
