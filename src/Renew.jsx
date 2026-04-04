@@ -203,6 +203,23 @@ if (!document.getElementById(STYLE_ID)) {
         filter: blur(0px);
       }
     }
+    /* Glass card reveal — fades in from below with blur dissolve */
+    @keyframes renewGlassReveal {
+      0% {
+        opacity: 0;
+        transform: translateY(16px) scale(0.97);
+        filter: blur(12px);
+      }
+      50% {
+        opacity: 0.7;
+        filter: blur(3px);
+      }
+      100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        filter: blur(0px);
+      }
+    }
     /* v2: Divider shimmer — light catching a wire */
     @keyframes renewDividerShimmer {
       0% { background-position: -100px 0; }
@@ -2492,100 +2509,8 @@ function RenewInner() {
       paddingRight: "max(28px, env(safe-area-inset-right, 28px))",
       fontFamily: FONT,
     }}>
-      {/* Breathing fog gradient — always present, slowly pulsing */}
-      <div style={{
-        position: "absolute", inset: 0, pointerEvents: "none",
-        background: "radial-gradient(ellipse at 50% 40%, rgba(124,106,255,0.07) 0%, rgba(79,70,229,0.025) 40%, transparent 70%)",
-        animation: "renewFogBreathe 12s ease-in-out infinite",
-      }} />
-
-      {/* Logo mark — silky entrance */}
-      <div style={{
-        width: 44, height: 44, borderRadius: "50%",
-        background: "radial-gradient(circle, rgba(165,180,252,0.18), rgba(79,70,229,0.06) 60%, transparent 80%)",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        marginBottom: 12,
-        animation: "renewLogoEntrance 1.4s cubic-bezier(0.22, 1, 0.36, 1) both",
-        animationDelay: "0.15s",
-      }}>
-        <div style={{
-          width: 9, height: 9, borderRadius: "50%",
-          background: "radial-gradient(circle, #A5B4FC, #6366F1)",
-          boxShadow: "0 0 20px rgba(165,180,252,0.5), 0 0 40px rgba(124,106,255,0.15)",
-          animation: "renewPulseGlow 5s ease-in-out infinite",
-        }} />
-      </div>
-
-      <h1 style={{
-        color: P.white, fontSize: 15, fontWeight: 700, margin: 0,
-        letterSpacing: 8, textTransform: "uppercase", fontFamily: FONT,
-        animation: "renewFadeInUp 1s cubic-bezier(0.22, 1, 0.36, 1) both",
-        animationDelay: "0.4s",
-      }}>
-        RENEW
-      </h1>
-
-      <div style={{
-        height: 1, position: "relative",
-        background: `linear-gradient(90deg, transparent, ${P.cardBorder}, transparent)`,
-        margin: "10px 0",
-        animation: "renewDividerGrow 1.2s cubic-bezier(0.22, 1, 0.36, 1) both",
-        animationDelay: "0.65s",
-        overflow: "hidden",
-      }}>
-        {/* Shimmer — light catching a thin wire */}
-        <div style={{
-          position: "absolute", inset: 0,
-          background: "linear-gradient(90deg, transparent 30%, rgba(165,180,252,0.25) 50%, transparent 70%)",
-          backgroundSize: "200px 1px",
-          animation: "renewDividerShimmer 4s linear infinite",
-          animationDelay: "2s",
-        }} />
-      </div>
-
-      {isFirstTime ? (
-        <div style={{
-          animation: "renewFadeInUp 1.1s cubic-bezier(0.22, 1, 0.36, 1) both",
-          animationDelay: "0.85s", textAlign: "center",
-        }}>
-          <p style={{
-            color: P.textSoft, fontSize: 14, fontWeight: 300, textAlign: "center",
-            maxWidth: 280, lineHeight: 1.8, margin: "0 0 4px", fontFamily: FONT_BODY,
-            opacity: 0.9,
-          }}>
-            speak the Word
-          </p>
-          <p style={{
-            color: P.textDim, fontSize: 11, fontWeight: 400, textAlign: "center",
-            maxWidth: 280, lineHeight: 1.6, margin: "0 0 16px", fontFamily: FONT_BODY,
-            letterSpacing: 0.3,
-          }}>
-            And watch what grows.
-          </p>
-        </div>
-      ) : (
-        <div style={{
-          animation: "renewFadeInUp 1.1s cubic-bezier(0.22, 1, 0.36, 1) both",
-          animationDelay: "0.85s", textAlign: "center",
-        }}>
-          <p style={{
-            color: P.textSoft, fontSize: 13, fontWeight: 300, textAlign: "center",
-            maxWidth: 300, lineHeight: 1.6, margin: "0 0 4px", fontFamily: FONT_BODY,
-          }}>
-            Your mind is being renewed.
-          </p>
-          <p style={{
-            color: P.textDim, fontSize: 10, fontWeight: 400, textAlign: "center",
-            maxWidth: 300, lineHeight: 1.5, margin: "0 0 16px", fontFamily: FONT_BODY,
-          }}>
-            {lifetimeNeurons} neurons formed across {sessionHistory.length} session{sessionHistory.length !== 1 ? "s" : ""}.
-          </p>
-        </div>
-      )}
-
-      {/* Refresh — top left, subtle */}
+      {/* Refresh — top left, subtle (always visible immediately) */}
       <button onClick={() => {
-        // Hard refresh: bypass all caches
         if (window.caches) caches.keys().then(names => names.forEach(n => caches.delete(n)));
         window.location.reload();
       }} style={{
@@ -2593,6 +2518,7 @@ function RenewInner() {
         background: "none", border: "none", color: P.textDim, fontSize: 9,
         cursor: "pointer", fontFamily: FONT, letterSpacing: 1, padding: "4px 0",
         transition: "color 0.3s", display: "flex", alignItems: "center", gap: 4,
+        zIndex: 2,
       }}>
         <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
           <path d="M13.5 8A5.5 5.5 0 1 1 8 2.5M8 2.5V6M8 2.5L11 2.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
@@ -2600,18 +2526,98 @@ function RenewInner() {
         REFRESH
       </button>
 
-      {/* Sign out — top right, subtle */}
+      {/* Sign out — top right, subtle (always visible immediately) */}
       <button onClick={handleSignOut} style={{
         position: "absolute", top: "max(20px, env(safe-area-inset-top, 20px))", right: "max(22px, env(safe-area-inset-right, 22px))",
         background: "none", border: "none", color: P.textDim, fontSize: 9,
         cursor: "pointer", fontFamily: FONT, letterSpacing: 1, padding: "4px 0",
-        transition: "color 0.3s",
+        transition: "color 0.3s", zIndex: 2,
       }}>SIGN OUT</button>
 
+      {/* ── Glass card: fades in after 2.5s delay so user sees the neural network first ── */}
       <div style={{
-        animation: "renewFadeInUp 1.2s cubic-bezier(0.22, 1, 0.36, 1) both",
-        animationDelay: "1.15s", display: "flex", flexDirection: "column", alignItems: "center",
+        display: "flex", flexDirection: "column", alignItems: "center",
+        background: "rgba(8, 6, 18, 0.55)",
+        backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)",
+        border: "1px solid rgba(124, 106, 255, 0.08)",
+        borderRadius: 22,
+        padding: "36px 32px 32px",
+        maxWidth: 340, width: "100%",
+        boxShadow: "0 8px 40px rgba(0,0,0,0.4), 0 0 80px rgba(124,106,255,0.04), inset 0 1px 0 rgba(255,255,255,0.03)",
+        animation: "renewGlassReveal 1.4s cubic-bezier(0.22, 1, 0.36, 1) both",
+        animationDelay: "2.5s",
       }}>
+        {/* Logo mark */}
+        <div style={{
+          width: 44, height: 44, borderRadius: "50%",
+          background: "radial-gradient(circle, rgba(165,180,252,0.18), rgba(79,70,229,0.06) 60%, transparent 80%)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          marginBottom: 12,
+        }}>
+          <div style={{
+            width: 9, height: 9, borderRadius: "50%",
+            background: "radial-gradient(circle, #A5B4FC, #6366F1)",
+            boxShadow: "0 0 20px rgba(165,180,252,0.5), 0 0 40px rgba(124,106,255,0.15)",
+            animation: "renewPulseGlow 5s ease-in-out infinite",
+          }} />
+        </div>
+
+        <h1 style={{
+          color: P.white, fontSize: 15, fontWeight: 700, margin: 0,
+          letterSpacing: 8, textTransform: "uppercase", fontFamily: FONT,
+        }}>
+          RENEW
+        </h1>
+
+        <div style={{
+          height: 1, width: 32, position: "relative",
+          background: `linear-gradient(90deg, transparent, ${P.cardBorder}, transparent)`,
+          margin: "10px 0",
+          overflow: "hidden",
+        }}>
+          <div style={{
+            position: "absolute", inset: 0,
+            background: "linear-gradient(90deg, transparent 30%, rgba(165,180,252,0.25) 50%, transparent 70%)",
+            backgroundSize: "200px 1px",
+            animation: "renewDividerShimmer 4s linear infinite",
+            animationDelay: "4s",
+          }} />
+        </div>
+
+        {isFirstTime ? (
+          <div style={{ textAlign: "center" }}>
+            <p style={{
+              color: P.textSoft, fontSize: 14, fontWeight: 300, textAlign: "center",
+              maxWidth: 280, lineHeight: 1.8, margin: "0 0 4px", fontFamily: FONT_BODY,
+              opacity: 0.9,
+            }}>
+              speak the Word
+            </p>
+            <p style={{
+              color: P.textDim, fontSize: 11, fontWeight: 400, textAlign: "center",
+              maxWidth: 280, lineHeight: 1.6, margin: "0 0 16px", fontFamily: FONT_BODY,
+              letterSpacing: 0.3,
+            }}>
+              And watch what grows.
+            </p>
+          </div>
+        ) : (
+          <div style={{ textAlign: "center" }}>
+            <p style={{
+              color: P.textSoft, fontSize: 13, fontWeight: 300, textAlign: "center",
+              maxWidth: 300, lineHeight: 1.6, margin: "0 0 4px", fontFamily: FONT_BODY,
+            }}>
+              Your mind is being renewed.
+            </p>
+            <p style={{
+              color: P.textDim, fontSize: 10, fontWeight: 400, textAlign: "center",
+              maxWidth: 300, lineHeight: 1.5, margin: "0 0 16px", fontFamily: FONT_BODY,
+            }}>
+              {lifetimeNeurons} neurons formed across {sessionHistory.length} session{sessionHistory.length !== 1 ? "s" : ""}.
+            </p>
+          </div>
+        )}
+
         <button className="renew-btn-tap" onClick={() => setScreen("pick-category")} style={{
           ...btnMain,
           background: "linear-gradient(135deg, #7C6AFF 0%, #6355D8 100%)",
@@ -2635,7 +2641,8 @@ function RenewInner() {
       {/* Footer verse — breathing opacity animation */}
       <div style={{
         position: "absolute", bottom: "max(24px, env(safe-area-inset-bottom, 24px))", left: 20, right: 20, textAlign: "center",
-        animation: "renewBreathe 8s cubic-bezier(0.37, 0, 0.63, 1) infinite",
+        animation: "renewGlassReveal 1.2s cubic-bezier(0.22, 1, 0.36, 1) both",
+        animationDelay: "3.2s",
       }}>
         <div style={{ color: P.textGhost, fontSize: 9, fontStyle: "italic", lineHeight: 1.6, fontFamily: FONT_BODY, letterSpacing: 0.3 }}>
           "This Book of the Law shall not depart from your mouth..."
