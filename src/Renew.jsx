@@ -315,7 +315,11 @@ if (!document.getElementById(STYLE_ID)) {
     .renew-btn-tap {
       transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.4s ease, opacity 0.3s ease;
       will-change: transform;
+      outline: none;
+      -webkit-tap-highlight-color: transparent;
     }
+    .renew-btn-tap:focus { outline: none; }
+    .renew-btn-tap:focus-visible { outline: 1px solid rgba(165,180,252,0.3); outline-offset: 2px; }
     .renew-btn-tap:active { transform: scale(0.96) !important; }
     /* Smooth scrolling for passage lists */
     .renew-smooth-scroll { scroll-behavior: smooth; -webkit-overflow-scrolling: touch; }
@@ -1238,10 +1242,10 @@ function RenewInner() {
 
   // Loading state — smooth two-phase reveal: dot glows, then fades into canvas
   useEffect(() => {
-    // Phase 1: show loading dot for 500ms
-    const fadeTimer = setTimeout(() => setLoadingFading(true), 500);
-    // Phase 2: after fade-out animation (800ms), remove overlay entirely
-    const removeTimer = setTimeout(() => setAppLoaded(true), 1300);
+    // Phase 1: show loading dot for 350ms
+    const fadeTimer = setTimeout(() => setLoadingFading(true), 350);
+    // Phase 2: after fade-out animation (600ms), remove overlay entirely
+    const removeTimer = setTimeout(() => setAppLoaded(true), 950);
     return () => { clearTimeout(fadeTimer); clearTimeout(removeTimer); };
   }, []);
 
@@ -1485,29 +1489,35 @@ function RenewInner() {
 
   const canSwipeBack = screen !== "home" && screen !== "session";
 
+  // Swipe-back: use refs for screen/canSwipe so touch handlers always have fresh values
+  const canSwipeBackRef = useRef(false);
+  canSwipeBackRef.current = canSwipeBack;
+  const goBackRef = useRef(goBack);
+  goBackRef.current = goBack;
+
   const handleTouchStart = useCallback((e) => {
-    if (!canSwipeBack) return;
+    // Always capture the start position — we check canSwipeBack on end
     const touch = e.touches[0];
     touchStartRef.current = { x: touch.clientX, y: touch.clientY, time: Date.now() };
-  }, [canSwipeBack]);
+  }, []);
 
   const handleTouchMove = useCallback((e) => {
-    if (!canSwipeBack) return;
+    if (!canSwipeBackRef.current) return;
     const touch = e.touches[0];
     const dx = touch.clientX - touchStartRef.current.x;
     const dy = touch.clientY - touchStartRef.current.y;
-    // Only show indicator if swiping predominantly right and started from left edge area
-    if (dx > 10 && Math.abs(dy) < dx * 0.8 && touchStartRef.current.x < 60) {
-      const progress = Math.min(1, dx / 120);
+    // Show indicator if swiping right and started from left edge area
+    if (dx > 10 && Math.abs(dy) < dx * 0.8 && touchStartRef.current.x < 80) {
+      const progress = Math.min(1, dx / 100);
       if (swipeOverlayRef.current) {
         swipeOverlayRef.current.style.opacity = progress * 0.6;
         swipeOverlayRef.current.style.transform = `translateX(${Math.min(dx * 0.3, 30) - 30}px)`;
       }
     }
-  }, [canSwipeBack]);
+  }, []);
 
   const handleTouchEnd = useCallback((e) => {
-    if (!canSwipeBack) return;
+    if (!canSwipeBackRef.current) return;
     // Reset overlay
     if (swipeOverlayRef.current) {
       swipeOverlayRef.current.style.opacity = 0;
@@ -1517,11 +1527,11 @@ function RenewInner() {
     const dx = touch.clientX - touchStartRef.current.x;
     const dy = touch.clientY - touchStartRef.current.y;
     const dt = Date.now() - touchStartRef.current.time;
-    // Trigger if: swiped right >80px with horizontal dominance, started from left 80px edge, within 400ms
-    if (dx > 80 && Math.abs(dy) < dx * 0.7 && touchStartRef.current.x < 80 && dt < 400) {
-      goBack();
+    // Trigger if: swiped right >60px with horizontal dominance, started from left 80px edge, within 600ms
+    if (dx > 60 && Math.abs(dy) < dx * 0.8 && touchStartRef.current.x < 80 && dt < 600) {
+      goBackRef.current();
     }
-  }, [canSwipeBack, goBack]);
+  }, []);
 
   // ─── Render loop ───
   useEffect(() => {
@@ -2548,8 +2558,8 @@ function RenewInner() {
         padding: "36px 32px 32px",
         maxWidth: 340, width: "100%",
         boxShadow: "0 8px 40px rgba(0,0,0,0.5), 0 0 80px rgba(124,106,255,0.05), inset 0 1px 0 rgba(255,255,255,0.04)",
-        animation: "renewGlassReveal 1.4s cubic-bezier(0.22, 1, 0.36, 1) both",
-        animationDelay: "1.2s",
+        animation: "renewGlassReveal 1s cubic-bezier(0.22, 1, 0.36, 1) both",
+        animationDelay: "0.6s",
       }}>
         {/* Logo mark */}
         <div style={{
@@ -2645,8 +2655,8 @@ function RenewInner() {
       {/* Footer verse — breathing opacity animation */}
       <div style={{
         position: "absolute", bottom: "max(24px, env(safe-area-inset-bottom, 24px))", left: 20, right: 20, textAlign: "center",
-        animation: "renewGlassReveal 1.2s cubic-bezier(0.22, 1, 0.36, 1) both",
-        animationDelay: "2s",
+        animation: "renewGlassReveal 1s cubic-bezier(0.22, 1, 0.36, 1) both",
+        animationDelay: "1.2s",
       }}>
         <div style={{ color: P.textGhost, fontSize: 9, fontStyle: "italic", lineHeight: 1.6, fontFamily: FONT_BODY, letterSpacing: 0.3 }}>
           "This Book of the Law shall not depart from your mouth..."
@@ -2670,7 +2680,9 @@ function RenewInner() {
       paddingLeft: "max(24px, env(safe-area-inset-left, 24px))",
       paddingRight: "max(24px, env(safe-area-inset-right, 24px))",
       overflowY: "auto", fontFamily: FONT,
-    }}>
+    }}
+    onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
+    >
       <button className="renew-btn-tap" onClick={() => setScreen("home")} style={backBtn}><svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ verticalAlign: "middle", marginRight: 6 }}><path d="M10 3L5 8L10 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>back</button>
       <div style={labelStyle}>Choose a pillar</div>
       <h2 style={{ color: P.white, fontSize: 18, fontWeight: 700, margin: "4px 0 22px", fontFamily: FONT, letterSpacing: 4 }}>
@@ -2721,7 +2733,9 @@ function RenewInner() {
       paddingLeft: "max(24px, env(safe-area-inset-left, 24px))",
       paddingRight: "max(24px, env(safe-area-inset-right, 24px))",
       overflowY: "auto", fontFamily: FONT,
-    }}>
+    }}
+    onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
+    >
       <button className="renew-btn-tap" onClick={() => setScreen("pick-category")} style={backBtn}><svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ verticalAlign: "middle", marginRight: 6 }}><path d="M10 3L5 8L10 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>back</button>
       <div style={{ marginBottom: 4 }}>
         <div style={labelStyle}>Pillar</div>
@@ -2790,7 +2804,9 @@ function RenewInner() {
       paddingLeft: "max(24px, env(safe-area-inset-left, 24px))",
       paddingRight: "max(24px, env(safe-area-inset-right, 24px))",
       fontFamily: FONT,
-    }}>
+    }}
+    onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
+    >
       <button className="renew-btn-tap" onClick={() => setScreen("home")} style={backBtn}><svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ verticalAlign: "middle", marginRight: 6 }}><path d="M10 3L5 8L10 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>back</button>
       <div style={labelStyle}>Custom passage</div>
       <h2 style={{ color: P.white, fontSize: 16, fontWeight: 700, margin: "4px 0 24px", fontFamily: FONT, letterSpacing: 2 }}>
@@ -3053,7 +3069,9 @@ function RenewInner() {
         paddingLeft: "max(28px, env(safe-area-inset-left, 28px))",
         paddingRight: "max(28px, env(safe-area-inset-right, 28px))",
         fontFamily: FONT,
-      }}>
+      }}
+      onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
+      >
         {/* Radial light burst behind "Well done" */}
         <div style={{
           position: "absolute", top: "30%", left: "50%", transform: "translate(-50%, -50%)",
@@ -3178,7 +3196,9 @@ function RenewInner() {
       paddingLeft: "max(24px, env(safe-area-inset-left, 24px))",
       paddingRight: "max(24px, env(safe-area-inset-right, 24px))",
       overflowY: "auto", fontFamily: FONT,
-    }}>
+    }}
+    onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
+    >
       <button className="renew-btn-tap" onClick={() => setScreen("home")} style={backBtn}><svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ verticalAlign: "middle", marginRight: 6 }}><path d="M10 3L5 8L10 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>back</button>
       <div style={labelStyle}>Your journey</div>
       <h2 style={{ color: P.white, fontSize: 18, fontWeight: 700, margin: "4px 0 22px", fontFamily: FONT, letterSpacing: 3 }}>
