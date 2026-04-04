@@ -968,6 +968,7 @@ function RenewInner() {
   const [sessionHistory, setSessionHistory] = useState([]);
   const [currentStreak, setCurrentStreak] = useState(0);
   const [longestStreak, setLongestStreak] = useState(0);
+  const [confirmResetIdx, setConfirmResetIdx] = useState(null); // Index (reversed) of session pending reset confirmation
   const [lifetimeSeconds, setLifetimeSeconds] = useState(0);
   const [lifetimeNeurons, setLifetimeNeurons] = useState(0);
 
@@ -1025,6 +1026,48 @@ function RenewInner() {
   useEffect(() => {
     saveToCloud();
   }, [sessionHistory, currentStreak, longestStreak, lifetimeSeconds, lifetimeNeurons, saveToCloud]);
+
+  // ─── Reset/delete a session from history ───
+  const handleResetSession = useCallback((reversedIdx) => {
+    // reversedIdx is the index in the reversed array; convert to real index
+    const realIdx = sessionHistory.length - 1 - reversedIdx;
+    const session = sessionHistory[realIdx];
+    if (!session) return;
+    // Remove session from history
+    const newHistory = sessionHistory.filter((_, i) => i !== realIdx);
+    // Subtract this session's stats from lifetime totals
+    setLifetimeSeconds(prev => Math.max(0, prev - (session.duration || 0)));
+    setLifetimeNeurons(prev => Math.max(0, prev - (session.neurons || 0)));
+    // Also remove the passage's neural network data if no other sessions use that ref
+    const refStillUsed = newHistory.some(s => s.ref === session.ref);
+    if (!refStillUsed) {
+      // Build a fake passage to get the key
+      const key = session.ref || "Custom";
+      delete passageNetworksRef.current[key];
+    }
+    setSessionHistory(newHistory);
+    // Recalculate streak from remaining history
+    const dates = [...new Set(newHistory.map(s => s.date).filter(Boolean))].sort();
+    if (dates.length === 0) {
+      setCurrentStreak(0);
+    } else {
+      let streak = 1;
+      for (let i = dates.length - 1; i > 0; i--) {
+        const curr = new Date(dates[i] + 'T00:00:00');
+        const prev = new Date(dates[i - 1] + 'T00:00:00');
+        const diff = Math.round((curr - prev) / (1000 * 60 * 60 * 24));
+        if (diff === 1) streak++;
+        else break;
+      }
+      // Only count streak if the most recent date is today or yesterday
+      const lastDate = new Date(dates[dates.length - 1] + 'T00:00:00');
+      const today = new Date(new Date().toISOString().slice(0, 10) + 'T00:00:00');
+      const daysSinceLast = Math.round((today - lastDate) / (1000 * 60 * 60 * 24));
+      if (daysSinceLast > 1) streak = 0;
+      setCurrentStreak(streak);
+    }
+    setConfirmResetIdx(null);
+  }, [sessionHistory]);
 
   // ─── Auth helpers ───
   const handleGoogleSignIn = async () => {
@@ -1383,11 +1426,28 @@ function RenewInner() {
       const ref = selectedPassage ? selectedPassage.ref : (customRef || "Custom");
       setSessionHistory(prev => [...prev, { date: today, ref, duration: dur, neurons: nc, pathways: pc, grew }]);
       setLifetimeSeconds(prev => prev + dur); setLifetimeNeurons(prev => prev + nc);
-      const newStreak = currentStreak + 1;
-      setCurrentStreak(newStreak); if (newStreak > longestStreak) setLongestStreak(newStreak);
+      // Streak logic: count unique calendar days, not sessions
+      // Find the most recent session date from history (before this session)
+      const prevDates = sessionHistory.map(s => s.date).filter(Boolean);
+      const lastSessionDate = prevDates.length > 0 ? prevDates[prevDates.length - 1] : null;
+      const alreadyToday = prevDates.includes(today);
+      if (!alreadyToday) {
+        // Check if last session was yesterday (continue streak) or older (reset to 1)
+        let newStreak = 1;
+        if (lastSessionDate) {
+          const lastDate = new Date(lastSessionDate + 'T00:00:00');
+          const todayDate = new Date(today + 'T00:00:00');
+          const diffDays = Math.round((todayDate - lastDate) / (1000 * 60 * 60 * 24));
+          if (diffDays === 1) newStreak = currentStreak + 1; // consecutive day
+          else if (diffDays === 0) newStreak = currentStreak; // same day (shouldn't reach here)
+          // else diffDays > 1 → streak resets to 1
+        }
+        setCurrentStreak(newStreak); if (newStreak > longestStreak) setLongestStreak(newStreak);
+      }
+      // If alreadyToday, streak stays the same — no increment for multiple sessions per day
       setScreen("summary");
     } else { setScreen(selectedCategory ? "pick-passage" : "home"); }
-  }, [totalTime, neuronCount, synapseCount, selectedPassage, selectedCategory, customRef, stopListening, saveCurrentNetwork, currentStreak, longestStreak, disposeTone, playEndSound]);
+  }, [totalTime, neuronCount, synapseCount, selectedPassage, selectedCategory, customRef, stopListening, saveCurrentNetwork, currentStreak, longestStreak, sessionHistory, disposeTone, playEndSound]);
 
   // ─── Swipe-back navigation ───
   const goBack = useCallback(() => {
@@ -3147,6 +3207,7 @@ function RenewInner() {
           const pillarCat = SCRIPTURE_CATEGORIES.find(c => c.passages.some(p => p.ref === s.ref));
           const pc = pillarCat ? getPillarColors(pillarCat.name).fire : [124, 106, 255];
           const refColor = `rgb(${pc[0]}, ${pc[1]}, ${pc[2]})`;
+          const isConfirming = confirmResetIdx === i;
           return (
           <div key={i} style={{
             ...card, padding: "12px 14px 12px 42px",
@@ -3166,9 +3227,37 @@ function RenewInner() {
                 {new Date(s.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
               </div>
             </div>
-            <div style={{ textAlign: "right" }}>
-              <div style={{ color: P.accent, fontSize: 12, fontWeight: 600, fontFamily: FONT }}>{fmtShort(s.duration)}</div>
-              <div style={{ color: P.textDim, fontSize: 9, fontFamily: FONT }}>{s.neurons} neurons</div>
+            <div style={{ textAlign: "right", display: "flex", alignItems: "center", gap: 8 }}>
+              {isConfirming ? (
+                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  <span style={{ color: P.textDim, fontSize: 8, fontFamily: FONT }}>Reset?</span>
+                  <button onClick={() => handleResetSession(i)} style={{
+                    background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.3)",
+                    borderRadius: 6, padding: "3px 8px", fontSize: 8, fontWeight: 600,
+                    color: "#EF4444", cursor: "pointer", fontFamily: FONT, letterSpacing: 0.5,
+                  }}>YES</button>
+                  <button onClick={() => setConfirmResetIdx(null)} style={{
+                    background: "rgba(255,255,255,0.05)", border: `1px solid ${P.cardBorder}`,
+                    borderRadius: 6, padding: "3px 8px", fontSize: 8, fontWeight: 600,
+                    color: P.textDim, cursor: "pointer", fontFamily: FONT, letterSpacing: 0.5,
+                  }}>NO</button>
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <div style={{ color: P.accent, fontSize: 12, fontWeight: 600, fontFamily: FONT }}>{fmtShort(s.duration)}</div>
+                    <div style={{ color: P.textDim, fontSize: 9, fontFamily: FONT }}>{s.neurons} neurons</div>
+                  </div>
+                  <button onClick={() => setConfirmResetIdx(i)} style={{
+                    background: "none", border: "none", cursor: "pointer", padding: 4,
+                    opacity: 0.3, transition: "opacity 0.2s",
+                  }} title="Reset session">
+                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+                      <path d="M4 4L12 12M12 4L4 12" stroke={P.textDim} strokeWidth="1.5" strokeLinecap="round"/>
+                    </svg>
+                  </button>
+                </>
+              )}
             </div>
           </div>
           );
@@ -3529,6 +3618,14 @@ function RenewInner() {
       <div key={screen} className={screen !== "session" ? "renew-screen-enter" : ""} style={{ position: "absolute", inset: 0, zIndex: 10 }}>
         {screenContent}
       </div>
+      {/* Version indicator — visible on all screens except session */}
+      {screen !== "session" && (
+        <div style={{
+          position: "fixed", bottom: 4, right: 8,
+          fontSize: 8, color: "#222", fontFamily: "monospace",
+          pointerEvents: "none", zIndex: 9999,
+        }}>v2026.04.04a</div>
+      )}
       {/* Loading state — logo dot materializing then dissolving */}
       {!appLoaded && (
         <div style={{
