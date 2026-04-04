@@ -907,6 +907,11 @@ function RenewInner() {
   const dendriteTimerRef = useRef(0); // New dendrite sprouting timer
   const neuronTimerRef = useRef(0);   // New neuron spawning timer
   const ambientFireTimerRef = useRef(0); // Ambient firing on non-session screens
+  const bokehCanvasRef = useRef(null);    // Offscreen canvas for bokeh blobs
+  const scanCanvasRef = useRef(null);     // Offscreen canvas for scan lines
+  const noiseCanvasRef = useRef(null);    // Offscreen canvas for sensor noise
+  const offscreenFrameRef = useRef(0);    // Frame counter for offscreen refresh rate
+  const lastCanvasSizeRef = useRef({ w: 0, h: 0 }); // Track canvas size for offscreen invalidation
   const toneRef = useRef(null);
   const sessionStartRef = useRef({ neurons: 0, synapses: 0, dendrites: 0, speakTime: 0 });
   const lastGrowthRef = useRef(null);
@@ -914,6 +919,10 @@ function RenewInner() {
   const swipeOverlayRef = useRef(null);
   const volumeRef = useRef(0);          // Bug 4 fix: avoid stale closures in render loop
   const isSpeakingRef = useRef(false);   // Bug 4 fix: avoid stale closures in render loop
+  const screenFlashRef = useRef(0);      // Transition flash on screen change
+  const prevScreenRef = useRef("home");  // Track previous screen for change detection
+  const reducedMotionRef = useRef(window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)').matches : false);
+  const adaptiveQualityRef = useRef({ level: 1, frameTimes: [] }); // 1 = full, 0.5 = reduced
 
   const [appLoaded, setAppLoaded] = useState(false);
   const [screen, setScreen] = useState("home");
@@ -1437,8 +1446,25 @@ function RenewInner() {
   useEffect(() => {
     const c = canvasRef.current; if (!c) return;
     const ctx = c.getContext("2d"); let run = true;
+
+    // Background tab throttling — stop render loop when hidden
+    let paused = false;
+    const handleVisibility = () => {
+      if (document.visibilityState === 'hidden') {
+        paused = true;
+        cancelAnimationFrame(animRef.current);
+      } else {
+        paused = false;
+        animRef.current = requestAnimationFrame(loop);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
     const loop = () => {
       if (!run) return;
+      if (paused) return;
+      // ── Accessibility: check reduced motion preference ──
+      const reducedMotion = reducedMotionRef.current;
       const dpr = window.devicePixelRatio || 1;
 
       // ── Per-frame canvas size check ──
@@ -1458,6 +1484,17 @@ function RenewInner() {
       if (w === 0 || h === 0) { animRef.current = requestAnimationFrame(loop); return; }
       // Scale canvas context for retina sharpness
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      // ── Offscreen canvas management ──
+      offscreenFrameRef.current++;
+      const sizeChanged = lastCanvasSizeRef.current.w !== w || lastCanvasSizeRef.current.h !== h;
+      if (sizeChanged) {
+        lastCanvasSizeRef.current = { w, h };
+        // Invalidate all offscreen canvases on resize
+        bokehCanvasRef.current = null;
+        scanCanvasRef.current = null;
+        noiseCanvasRef.current = null;
+      }
 
       // ── Reposition neurons if they're outside the visible canvas ──
       if (st && st.neurons && st.neurons.length > 0 && w > 10 && h > 10) {
@@ -1488,6 +1525,21 @@ function RenewInner() {
       }
       if (!st) { animRef.current = requestAnimationFrame(loop); return; }
       const now = Date.now();
+
+      // ── Adaptive quality: track frame times ──
+      const aq = adaptiveQualityRef.current;
+      if (aq._lastFrame) {
+        const dt = now - aq._lastFrame;
+        aq.frameTimes.push(dt);
+        if (aq.frameTimes.length > 60) aq.frameTimes.shift();
+        if (aq.frameTimes.length >= 30) {
+          const avg = aq.frameTimes.reduce((a, b) => a + b, 0) / aq.frameTimes.length;
+          if (avg > 20 && aq.level > 0.5) aq.level = 0.5; // degrade quality
+          else if (avg < 14 && aq.level < 1) aq.level = 1; // restore quality
+        }
+      }
+      aq._lastFrame = now;
+      const qualityLevel = aq.level;
 
       // ─── Performance: build O(1) lookup maps once per frame ───
       const neuronMap = new Map();
@@ -1586,6 +1638,21 @@ function RenewInner() {
       breathPhaseRef.current += breathSpeed;
       const breath = Math.sin(breathPhaseRef.current) * 0.5 + 0.5; // 0 to 1
 
+      // ── Transition flash: detect screen change ──
+      if (screen !== prevScreenRef.current) {
+        prevScreenRef.current = screen;
+        screenFlashRef.current = 1;
+      }
+      if (screenFlashRef.current > 0) {
+        screenFlashRef.current *= 0.93;
+        if (screenFlashRef.current < 0.01) screenFlashRef.current = 0;
+        if (st && st.neurons) {
+          for (const n of st.neurons) {
+            n.fireLevel = Math.min(1, n.fireLevel + screenFlashRef.current * 0.12);
+          }
+        }
+      }
+
       // ─── Update particles: noise-field flow + Brownian motion + depth-based speed ───
       if (particlesRef.current) {
         const pTime = now * 0.001; // seconds for noise sampling
@@ -1674,11 +1741,13 @@ function RenewInner() {
         if (n.y < 70 || n.y > h - 70) n.vy *= -0.95;
         n.x = Math.max(20, Math.min(w - 20, n.x));
         n.y = Math.max(60, Math.min(h - 60, n.y));
-        n.fireLevel *= 0.993;
+        // Two-phase fire decay: fast drop from peak, slow lingering glow
+        n.fireLevel *= n.fireLevel > 0.3 ? 0.988 : 0.996;
         // Animate dendrite growth — slowly extend toward targetLength with unfurling curve
         for (const d of n.dendrites) {
           if (d.targetLength && d.length < d.targetLength) {
-            d.length = Math.min(d.targetLength, d.length + 0.4); // visible organic extension
+            const growBurst = 0.25 + noise2D(n.id + d.angle * 5, now * 0.001 * 0.2) * 0.25;
+            d.length = Math.min(d.targetLength, d.length + growBurst); // noise-modulated growth bursts
             // Unfurling: curves deepen as dendrite extends, like a plant growing toward light
             const growthPct = d.length / d.targetLength;
             if (growthPct < 0.8) {
@@ -1694,7 +1763,7 @@ function RenewInner() {
       for (const s of st.synapses) {
         // Animate synapse formation — "reaching moment"
         if (s.forming) {
-          s.formProgress = Math.min(1, s.formProgress + 0.008); // ~2 seconds to fully form
+          s.formProgress = Math.min(1, s.formProgress + 0.005 + 0.01 * Math.sin(s.formProgress * Math.PI)); // ease-in-out formation
           if (s.formProgress >= 1) {
             s.forming = false;
             // Sound: gentle connection harmonic
@@ -1706,7 +1775,7 @@ function RenewInner() {
           }
         }
         if (s.pulsePos >= 0 && s.pulsePos <= 1) {
-          s.pulsePos += 0.007;     // pulses crawl along pathways
+          s.pulsePos += 0.005 + 0.006 * Math.sin(s.pulsePos * Math.PI); // accelerate mid-path, slow at endpoints
           if (s.pulsePos > 1) {
             s.pulsePos = -1;
             const target = neuronMap.get(s.to);
@@ -1738,37 +1807,76 @@ function RenewInner() {
       const bph = breathPhaseRef.current; // shorthand for noise time
       const nowS = now * 0.001; // seconds for noise sampling
 
+      // ── Screen-dependent color temperature offset ──
+      const screenTempR = screen === "home" ? -5 : screen === "session" ? 10 : screen === "summary" ? 20 : 0;
+      const screenTempG = screen === "home" ? -3 : screen === "session" ? 5 : screen === "summary" ? 15 : 0;
+      const screenTempB = screen === "home" ? 8 : screen === "session" ? -5 : screen === "summary" ? -15 : 0;
+
       // ── Layer 1: Pure black background ──
       ctx.fillStyle = "#000000";
       ctx.fillRect(0, 0, w, h);
 
-      // ── Layer 2: Bokeh blobs — noise-driven drift, varied sizes & colors ──
-      const bokehCount = 15;
-      for (let i = 0; i < bokehCount; i++) {
-        const nx = noise2D(i * 3.7, nowS * 0.08) * 0.5 + 0.5;
-        const ny = noise2D(i * 3.7 + 100, nowS * 0.06) * 0.5 + 0.5;
-        const bokehX = nx * w;
-        const bokehY = ny * h;
-        const bokehR = 30 + noise2D(i * 5.1, nowS * 0.04) * 25 + i * 3;
-        // Alternate warm (magenta) and cool (teal) bokeh for multi-channel look
-        const isWarm = i % 3 === 0;
-        const isCool = i % 3 === 1;
-        const br = isWarm ? 100 : isCool ? 50 : 80;
-        const bg = isWarm ? 50 : isCool ? 80 : 60;
-        const bb = isWarm ? 90 : isCool ? 120 : 120;
-        const bOp = 0.025 + noise2D(i * 2.3, nowS * 0.1) * 0.012;
-        const bokehGrad = ctx.createRadialGradient(bokehX, bokehY, 0, bokehX, bokehY, bokehR);
-        bokehGrad.addColorStop(0, `rgba(${br}, ${bg}, ${bb}, ${bOp})`);
-        bokehGrad.addColorStop(0.5, `rgba(${br}, ${bg}, ${bb}, ${bOp * 0.4})`);
-        bokehGrad.addColorStop(1, `rgba(0, 0, 0, 0)`);
-        ctx.fillStyle = bokehGrad;
-        ctx.beginPath(); ctx.arc(bokehX, bokehY, bokehR, 0, Math.PI * 2); ctx.fill();
+      // ── Layer 2: Bokeh blobs — offscreen cached, refreshed every 6th frame ──
+      if (!bokehCanvasRef.current || offscreenFrameRef.current % 6 === 0) {
+        const bkOff = bokehCanvasRef.current || document.createElement('canvas');
+        bkOff.width = Math.round(w * dpr); bkOff.height = Math.round(h * dpr);
+        const bkCtx = bkOff.getContext('2d');
+        bkCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        bkCtx.clearRect(0, 0, w, h);
+        const bokehCount = 15;
+        for (let i = 0; i < bokehCount; i++) {
+          const nx = noise2D(i * 3.7, nowS * 0.08) * 0.5 + 0.5;
+          const ny = noise2D(i * 3.7 + 100, nowS * 0.06) * 0.5 + 0.5;
+          const bokehX = nx * w;
+          const bokehY = ny * h;
+          const bokehR = 30 + noise2D(i * 5.1, nowS * 0.04) * 25 + i * 3;
+          const isWarm = i % 3 === 0;
+          const isCool = i % 3 === 1;
+          const br = isWarm ? 100 : isCool ? 50 : 80;
+          const bg = isWarm ? 50 : isCool ? 80 : 60;
+          const bb = isWarm ? 90 : isCool ? 120 : 120;
+          const bOp = 0.025 + noise2D(i * 2.3, nowS * 0.1) * 0.012;
+          const bokehGrad = bkCtx.createRadialGradient(bokehX, bokehY, 0, bokehX, bokehY, bokehR);
+          bokehGrad.addColorStop(0, `rgba(${br}, ${bg}, ${bb}, ${bOp})`);
+          bokehGrad.addColorStop(0.5, `rgba(${br}, ${bg}, ${bb}, ${bOp * 0.4})`);
+          bokehGrad.addColorStop(1, `rgba(0, 0, 0, 0)`);
+          bkCtx.fillStyle = bokehGrad;
+          bkCtx.beginPath(); bkCtx.arc(bokehX, bokehY, bokehR, 0, Math.PI * 2); bkCtx.fill();
+        }
+        bokehCanvasRef.current = bkOff;
       }
+      ctx.drawImage(bokehCanvasRef.current, 0, 0, w, h);
+
+      // ── Layer 2.25: Atmospheric fog layers ──
+      // Slow-moving volumetric fog
+      const fogX = w * (0.5 + noise2D(0.5, nowS * 0.015) * 0.4);
+      const fogY = h * (0.5 + noise2D(100.5, nowS * 0.012) * 0.35);
+      const fogR = Math.min(w, h) * (0.35 + noise2D(200, nowS * 0.01) * 0.15);
+      const fogGrad = ctx.createRadialGradient(fogX, fogY, 0, fogX, fogY, fogR);
+      fogGrad.addColorStop(0, `rgba(80, 60, 120, 0.018)`);
+      fogGrad.addColorStop(0.6, `rgba(60, 50, 100, 0.008)`);
+      fogGrad.addColorStop(1, `rgba(0, 0, 0, 0)`);
+      ctx.fillStyle = fogGrad;
+      ctx.fillRect(0, 0, w, h);
+      // Depth fog: vertical gradient at top/bottom edges
+      const depthFogTop = ctx.createLinearGradient(0, 0, 0, h * 0.15);
+      depthFogTop.addColorStop(0, `rgba(40, 30, 70, 0.04)`);
+      depthFogTop.addColorStop(1, `rgba(0, 0, 0, 0)`);
+      ctx.fillStyle = depthFogTop;
+      ctx.fillRect(0, 0, w, h * 0.15);
+      const depthFogBot = ctx.createLinearGradient(0, h * 0.85, 0, h);
+      depthFogBot.addColorStop(0, `rgba(0, 0, 0, 0)`);
+      depthFogBot.addColorStop(1, `rgba(40, 30, 70, 0.035)`);
+      ctx.fillStyle = depthFogBot;
+      ctx.fillRect(0, h * 0.85, w, h * 0.15);
 
       // ── Layer 2.5: Depth-layered dust particles (real particle system) ──
       if (particlesRef.current) {
         ctx.lineCap = "round";
+        let _pSkip = 0;
         for (const p of particlesRef.current) {
+          if (reducedMotion) continue;
+          if (qualityLevel < 1 && ++_pSkip % 2 !== 0) continue;
           // Depth-based color: far = warm red-shifted, near = cool blue-white
           const depth = p.depth; // 0=far, 1=near
           const pr = Math.round(180 - depth * 40);  // far=180, near=140
@@ -1831,7 +1939,7 @@ function RenewInner() {
             ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
           }
 
-          // ── Branches with taper ──
+          // ── Branches with bloom glow + spectral gradient ──
           if (d.branches) {
             for (const br of d.branches) {
               const [bx0, by0] = bezPt(n.x, n.y, cp1x, cp1y, tipX, tipY, br.t);
@@ -1846,8 +1954,18 @@ function RenewInner() {
                 const btMid = (bt0 + bt1) / 2;
                 const bW = 1.5 * (1 - btMid * 0.85) * n.maturity;
                 const bOp = (0.3 + fireB * 0.2) * n.maturity;
-                ctx.strokeStyle = `rgba(110, 140, 220, ${bOp})`;
+                // Spectral gradient inherited from parent t position
+                const parentT = br.t || 0.5;
+                const combinedT = parentT + (1 - parentT) * btMid;
+                const bsr = Math.round(140 - combinedT * 60);
+                const bsg = Math.round(120 + combinedT * 60);
+                const bsb = Math.round(220 + combinedT * 20);
+                ctx.strokeStyle = `rgba(${bsr}, ${bsg}, ${bsb}, ${bOp})`;
                 ctx.lineWidth = Math.max(0.3, bW);
+                ctx.beginPath(); ctx.moveTo(bxA, byA); ctx.lineTo(bxB, byB); ctx.stroke();
+                // Bloom glow pass
+                ctx.strokeStyle = `rgba(${bsr + 20}, ${bsg + 20}, ${Math.min(255, bsb + 10)}, ${bOp * 0.2})`;
+                ctx.lineWidth = Math.max(0.5, bW * 2.5);
                 ctx.beginPath(); ctx.moveTo(bxA, byA); ctx.lineTo(bxB, byB); ctx.stroke();
               }
             }
@@ -1861,17 +1979,31 @@ function RenewInner() {
             // Noise determines density — some patches are spine-dense, some bare
             const spineDensity = noise2D(spineSeed + spt * 8, 0) * 0.5 + 0.5;
             if (spineDensity < 0.35) continue; // bare region
-            const [sx, sy] = bezPt(n.x, n.y, cp1x, cp1y, tipX, tipY, spt);
+            const [sx0, sy0] = bezPt(n.x, n.y, cp1x, cp1y, tipX, tipY, spt);
+            // Perpendicular offset: compute tangent, offset alternating left/right
+            const tDelta = 0.01;
+            const [stx1, sty1] = bezPt(n.x, n.y, cp1x, cp1y, tipX, tipY, Math.min(1, spt + tDelta));
+            const tang = Math.atan2(sty1 - sy0, stx1 - sx0);
+            const perpDir = (i % 2 === 0) ? 1 : -1;
+            const perpDist = 2 + spineDensity * 2;
+            const sx = sx0 + Math.cos(tang + Math.PI / 2) * perpDir * perpDist;
+            const sy = sy0 + Math.sin(tang + Math.PI / 2) * perpDir * perpDist;
             // Mushroom spines (larger) vs thin spines
             const isMushroom = spineDensity > 0.75;
             const spR = isMushroom ? 2.0 : 1.0;
             const spineOp = (0.25 + fireB * 0.35 + (isMushroom ? 0.1 : 0)) * n.maturity;
             ctx.fillStyle = `rgba(150, 140, 240, ${spineOp})`;
             ctx.beginPath(); ctx.arc(sx, sy, spR, 0, Math.PI * 2); ctx.fill();
-            // Mushroom spines get a tiny bright PSD dot
+            // Mushroom spines: bright PSD dot + bloom halo
             if (isMushroom) {
               ctx.fillStyle = `rgba(200, 200, 255, ${spineOp * 0.6})`;
               ctx.beginPath(); ctx.arc(sx, sy, 0.7, 0, Math.PI * 2); ctx.fill();
+              // Bloom halo (tiny radial gradient)
+              const spGlow = ctx.createRadialGradient(sx, sy, 0, sx, sy, 4);
+              spGlow.addColorStop(0, `rgba(170, 160, 255, ${spineOp * 0.3})`);
+              spGlow.addColorStop(1, `rgba(170, 160, 255, 0)`);
+              ctx.fillStyle = spGlow;
+              ctx.beginPath(); ctx.arc(sx, sy, 4, 0, Math.PI * 2); ctx.fill();
             }
           }
 
@@ -1888,7 +2020,11 @@ function RenewInner() {
               const filY = gc_y + Math.sin(filAngle) * filLen;
               // Cyan-tinted at tip (GFP concentration)
               ctx.strokeStyle = `rgba(100, 180, 230, ${0.35 * n.maturity})`;
-              ctx.lineWidth = 0.4;
+              ctx.lineWidth = 0.6;
+              ctx.beginPath(); ctx.moveTo(gc_x, gc_y); ctx.lineTo(filX, filY); ctx.stroke();
+              // Filopodia bloom glow
+              ctx.strokeStyle = `rgba(100, 180, 230, ${0.35 * n.maturity * 0.15})`;
+              ctx.lineWidth = 1.8;
               ctx.beginPath(); ctx.moveTo(gc_x, gc_y); ctx.lineTo(filX, filY); ctx.stroke();
             }
             // Lamellipodium glow — pulsing with neuron breath
@@ -1930,9 +2066,29 @@ function RenewInner() {
           ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
         }
 
+        // Activity highway glow — lights up when recently active
+        if (s.activity > 0.3) {
+          for (let i = 0; i < segments; i++) {
+            const t0 = i / segments, t1 = (i + 1) / segments;
+            if (t0 >= drawEnd) break;
+            const actualT1 = Math.min(t1, drawEnd);
+            const [x0, y0] = bezPt(from.x, from.y, cpx, cpy, to.x, to.y, t0);
+            const [x1, y1] = bezPt(from.x, from.y, cpx, cpy, to.x, to.y, actualT1);
+            // Color shifts toward brighter cyan-white with activity
+            const actR = Math.round(110 + s.activity * 50);
+            const actG = Math.round(100 + s.activity * 80);
+            const actB = Math.round(200 + s.activity * 40);
+            ctx.strokeStyle = `rgba(${actR}, ${actG}, ${actB}, ${s.activity * 0.12 * formOp})`;
+            ctx.lineWidth = (0.6 + (s.strength || 0) * 4) * 3;
+            ctx.lineCap = "round";
+            ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+          }
+        }
+
         // Synaptic puncta — cyan-teal tint (different fluorescent channel)
         const [px, py] = bezPt(from.x, from.y, cpx, cpy, to.x, to.y, 0.7);
-        const punctaOp = (0.45 + s.activity * 0.35) * formOp * sAlpha;
+        const punctaFlash = s.pulsePos >= 0.65 && s.pulsePos <= 0.85 ? Math.sin((s.pulsePos - 0.65) / 0.2 * Math.PI) * 0.4 : 0;
+        const punctaOp = (0.45 + s.activity * 0.35 + punctaFlash) * formOp * sAlpha;
         const punctaR = 1.5 + (s.strength || 0) * 3;
         ctx.fillStyle = `rgba(130, 200, 240, ${punctaOp})`;
         ctx.beginPath(); ctx.arc(px, py, punctaR, 0, Math.PI * 2); ctx.fill();
@@ -2028,17 +2184,42 @@ function RenewInner() {
         ctx.lineWidth = 0.8;
         ctx.beginPath(); ctx.arc(n.x, n.y, airyR, 0, Math.PI * 2); ctx.stroke();
 
-        // ── Pass 2: Soma body (membrane → cytoplasm → center) ──
+        // ── Pass 2: Soma body — organic shape from bodyShape vertices ──
         const somaGrad = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, r);
         // Firing: shift toward warm white-pink
-        const fireR = Math.round(180 + fire * 40); // 180→220
-        const fireG = Math.round(160 + fire * 40); // 160→200
-        const fireBlue = Math.round(240 - fire * 10); // 240→230
+        const fireR = Math.round(180 + fire * 40);
+        const fireG = Math.round(160 + fire * 40);
+        const fireBlue = Math.round(240 - fire * 10);
         somaGrad.addColorStop(0, `rgba(${fireR}, ${fireG}, ${fireBlue}, ${(0.65 + fire * 0.3) * n.maturity})`);
         somaGrad.addColorStop(0.55, `rgba(${fireR - 30}, ${fireG - 30}, ${Math.max(0, fireBlue - 20)}, ${(0.4 + fire * 0.2) * n.maturity})`);
         somaGrad.addColorStop(1, `rgba(100, 80, 180, 0)`);
         ctx.fillStyle = somaGrad;
-        ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, Math.PI * 2); ctx.fill();
+        // Draw organic shape using bodyShape vertices with bezier interpolation
+        if (n.bodyShape && n.bodyShape.length >= 3) {
+          ctx.beginPath();
+          const bs = n.bodyShape;
+          const bsLen = bs.length;
+          for (let vi = 0; vi < bsLen; vi++) {
+            const curr = bs[vi];
+            const next = bs[(vi + 1) % bsLen];
+            const cx1 = n.x + Math.cos(curr.angle) * r * curr.r;
+            const cy1 = n.y + Math.sin(curr.angle) * r * curr.r;
+            const cx2 = n.x + Math.cos(next.angle) * r * next.r;
+            const cy2 = n.y + Math.sin(next.angle) * r * next.r;
+            const midX = (cx1 + cx2) / 2;
+            const midY = (cy1 + cy2) / 2;
+            if (vi === 0) ctx.moveTo(midX, midY);
+            const nextNext = bs[(vi + 2) % bsLen];
+            const cx3 = n.x + Math.cos(nextNext.angle) * r * nextNext.r;
+            const cy3 = n.y + Math.sin(nextNext.angle) * r * nextNext.r;
+            const nextMidX = (cx2 + cx3) / 2;
+            const nextMidY = (cy2 + cy3) / 2;
+            ctx.quadraticCurveTo(cx2, cy2, nextMidX, nextMidY);
+          }
+          ctx.closePath(); ctx.fill();
+        } else {
+          ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, Math.PI * 2); ctx.fill();
+        }
 
         // ── Internal organelle texture (membrane blobs) ──
         if (n.membraneBlobs) {
@@ -2071,6 +2252,17 @@ function RenewInner() {
           ctx.fillStyle = fireGrad;
           ctx.beginPath(); ctx.arc(n.x, n.y, cascadeR, 0, Math.PI * 2); ctx.fill();
         }
+      }
+
+      // ── Neuron proximity fog: scattered fluorescence around each soma ──
+      for (const n of st.neurons) {
+        const proxR = 50 + n.radius * 2;
+        const proxGrad = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, proxR);
+        proxGrad.addColorStop(0, `rgba(120, 100, 170, ${0.025 * n.maturity})`);
+        proxGrad.addColorStop(0.5, `rgba(100, 80, 150, ${0.012 * n.maturity})`);
+        proxGrad.addColorStop(1, `rgba(0, 0, 0, 0)`);
+        ctx.fillStyle = proxGrad;
+        ctx.beginPath(); ctx.arc(n.x, n.y, proxR, 0, Math.PI * 2); ctx.fill();
       }
 
       // ── Layer 6: Ambient firing — exponential inter-fire intervals ──
@@ -2107,7 +2299,9 @@ function RenewInner() {
       const vignetteGrad = ctx.createRadialGradient(w / 2, h / 2, vigR * 0.25, w / 2, h / 2, vigR * 0.85);
       vignetteGrad.addColorStop(0, `rgba(0, 0, 0, 0)`);
       vignetteGrad.addColorStop(0.7, `rgba(0, 0, 0, 0.06)`);
-      vignetteGrad.addColorStop(1, `rgba(0, 0, 0, 0.18)`);
+      // Voice-responsive: louder speaking pulls vignette back slightly
+      const vignetteMax = isSessionScreen && spk ? 0.18 - vol * 0.06 : 0.18;
+      vignetteGrad.addColorStop(1, `rgba(0, 0, 0, ${vignetteMax})`);
       ctx.fillStyle = vignetteGrad;
       ctx.fillRect(0, 0, w, h);
       // Faint microscope objective lens border
@@ -2116,28 +2310,45 @@ function RenewInner() {
       ctx.lineWidth = 1;
       ctx.beginPath(); ctx.arc(w / 2, h / 2, objR / 2, 0, Math.PI * 2); ctx.stroke();
 
-      // ── Layer 8: Sensor noise + subtle scan lines (scientific authenticity) ──
-      // Shot noise: sparse random dots (cheap — just 150 dots)
-      const noiseOp = 0.015;
-      ctx.fillStyle = `rgba(180, 170, 210, ${noiseOp})`;
-      for (let i = 0; i < 150; i++) {
-        // Use fast pseudo-random from shimmer timer for varying positions each frame
-        const seed = shimmerTimerRef.current * 17 + i * 131;
-        const nx2 = ((seed * 2654435761) >>> 0) / 4294967296 * w;
-        const ny2 = ((seed * 2246822519) >>> 0) / 4294967296 * h;
-        ctx.fillRect(nx2, ny2, 1, 1);
-      }
-      // Scan lines (every 4px, extremely subtle)
-      ctx.strokeStyle = `rgba(100, 90, 130, 0.008)`;
-      ctx.lineWidth = 0.5;
-      for (let y = 0; y < h; y += 4) {
-        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+      // ── Layer 8: Sensor noise + scan lines — offscreen cached ──
+      if (!reducedMotion) {
+        // Sensor noise: refresh every 3rd frame
+        if (!noiseCanvasRef.current || offscreenFrameRef.current % 3 === 0) {
+          const nOff = noiseCanvasRef.current || document.createElement('canvas');
+          nOff.width = Math.round(w * dpr); nOff.height = Math.round(h * dpr);
+          const nCtx = nOff.getContext('2d');
+          nCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          nCtx.clearRect(0, 0, w, h);
+          nCtx.fillStyle = `rgba(180, 170, 210, 0.015)`;
+          for (let i = 0; i < 150; i++) {
+            const seed = (offscreenFrameRef.current || 0) * 17 + i * 131;
+            const nx2 = ((seed * 2654435761) >>> 0) / 4294967296 * w;
+            const ny2 = ((seed * 2246822519) >>> 0) / 4294967296 * h;
+            nCtx.fillRect(nx2, ny2, 1, 1);
+          }
+          noiseCanvasRef.current = nOff;
+        }
+        ctx.drawImage(noiseCanvasRef.current, 0, 0, w, h);
+        // Scan lines: render once, cache forever
+        if (!scanCanvasRef.current) {
+          const sOff = document.createElement('canvas');
+          sOff.width = Math.round(w * dpr); sOff.height = Math.round(h * dpr);
+          const sCtx = sOff.getContext('2d');
+          sCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          sCtx.strokeStyle = `rgba(100, 90, 130, 0.008)`;
+          sCtx.lineWidth = 0.5;
+          for (let y = 0; y < h; y += 4) {
+            sCtx.beginPath(); sCtx.moveTo(0, y); sCtx.lineTo(w, y); sCtx.stroke();
+          }
+          scanCanvasRef.current = sOff;
+        }
+        ctx.drawImage(scanCanvasRef.current, 0, 0, w, h);
       }
 
       animRef.current = requestAnimationFrame(loop);
     };
     animRef.current = requestAnimationFrame(loop);
-    return () => { run = false; cancelAnimationFrame(animRef.current); };
+    return () => { run = false; cancelAnimationFrame(animRef.current); document.removeEventListener('visibilitychange', handleVisibility); };
   }, [isListening, screen]);
 
   useEffect(() => () => stopListening(), [stopListening]);
@@ -3120,7 +3331,7 @@ function RenewInner() {
             position: "fixed", bottom: 4, right: 8,
             fontSize: 8, color: "#222", fontFamily: "monospace",
             pointerEvents: "none", zIndex: 9999,
-          }}>v2026.04.03g</div>
+          }}>v2026.04.04a</div>
         </div>
       );
     }
