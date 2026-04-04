@@ -942,6 +942,7 @@ function RenewInner() {
   const adaptiveQualityRef = useRef({ level: 1, frameTimes: [] }); // 1 = full, 0.5 = reduced
 
   const [appLoaded, setAppLoaded] = useState(false);
+  const [loadingFading, setLoadingFading] = useState(false); // loading overlay fade-out phase
   const [screen, setScreen] = useState("home");
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [selectedPassage, setSelectedPassage] = useState(null);
@@ -1235,10 +1236,13 @@ function RenewInner() {
     return combined;
   }, []);
 
-  // Loading state — brief elegant reveal
+  // Loading state — smooth two-phase reveal: dot glows, then fades into canvas
   useEffect(() => {
-    const timer = setTimeout(() => setAppLoaded(true), 600);
-    return () => clearTimeout(timer);
+    // Phase 1: show loading dot for 500ms
+    const fadeTimer = setTimeout(() => setLoadingFading(true), 500);
+    // Phase 2: after fade-out animation (800ms), remove overlay entirely
+    const removeTimer = setTimeout(() => setAppLoaded(true), 1300);
+    return () => { clearTimeout(fadeTimer); clearTimeout(removeTimer); };
   }, []);
 
   const speakAccRef = useRef(0);
@@ -2545,7 +2549,7 @@ function RenewInner() {
         maxWidth: 340, width: "100%",
         boxShadow: "0 8px 40px rgba(0,0,0,0.5), 0 0 80px rgba(124,106,255,0.05), inset 0 1px 0 rgba(255,255,255,0.04)",
         animation: "renewGlassReveal 1.4s cubic-bezier(0.22, 1, 0.36, 1) both",
-        animationDelay: "2.5s",
+        animationDelay: "1.2s",
       }}>
         {/* Logo mark */}
         <div style={{
@@ -2642,7 +2646,7 @@ function RenewInner() {
       <div style={{
         position: "absolute", bottom: "max(24px, env(safe-area-inset-bottom, 24px))", left: 20, right: 20, textAlign: "center",
         animation: "renewGlassReveal 1.2s cubic-bezier(0.22, 1, 0.36, 1) both",
-        animationDelay: "3.2s",
+        animationDelay: "2s",
       }}>
         <div style={{ color: P.textGhost, fontSize: 9, fontStyle: "italic", lineHeight: 1.6, fontFamily: FONT_BODY, letterSpacing: 0.3 }}>
           "This Book of the Law shall not depart from your mouth..."
@@ -3633,17 +3637,24 @@ function RenewInner() {
           pointerEvents: "none", zIndex: 9999,
         }}>v2026.04.04a</div>
       )}
-      {/* Loading state — logo dot materializing then dissolving */}
+      {/* Loading state — logo dot materializes then dissolves smoothly into canvas */}
       {!appLoaded && (
         <div style={{
           position: "absolute", inset: 0, zIndex: 100,
           background: "#000", display: "flex", alignItems: "center", justifyContent: "center",
+          transition: "opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1), background 0.8s ease",
+          opacity: loadingFading ? 0 : 1,
+          background: loadingFading ? "transparent" : "#000",
+          pointerEvents: loadingFading ? "none" : "auto",
         }}>
           <div style={{
             width: 9, height: 9, borderRadius: "50%",
             background: "radial-gradient(circle, #A5B4FC, #6366F1)",
             boxShadow: "0 0 30px rgba(165,180,252,0.5), 0 0 60px rgba(124,106,255,0.2)",
             animation: "renewLogoEntrance 0.8s cubic-bezier(0.22, 1, 0.36, 1) both",
+            transition: "transform 0.8s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.8s ease",
+            transform: loadingFading ? "scale(2.5)" : "scale(1)",
+            opacity: loadingFading ? 0 : 1,
           }} />
         </div>
       )}
