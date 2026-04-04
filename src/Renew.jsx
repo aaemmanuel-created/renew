@@ -315,12 +315,15 @@ if (!document.getElementById(STYLE_ID)) {
     .renew-btn-tap {
       transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.4s ease, opacity 0.3s ease;
       will-change: transform;
-      outline: none;
+      outline: none !important;
       -webkit-tap-highlight-color: transparent;
+      -webkit-focus-ring-color: transparent;
     }
-    .renew-btn-tap:focus { outline: none; }
-    .renew-btn-tap:focus-visible { outline: 1px solid rgba(165,180,252,0.3); outline-offset: 2px; }
+    .renew-btn-tap:focus, .renew-btn-tap:focus-within { outline: none !important; box-shadow: none; }
+    .renew-btn-tap:focus-visible { outline: none !important; }
     .renew-btn-tap:active { transform: scale(0.96) !important; }
+    /* Remove focus rings from all buttons and interactive elements globally */
+    button:focus, button:focus-visible, a:focus { outline: none !important; -webkit-tap-highlight-color: transparent; }
     /* Smooth scrolling for passage lists */
     .renew-smooth-scroll { scroll-behavior: smooth; -webkit-overflow-scrolling: touch; }
     /* Screen transitions — silk float-in */
@@ -2694,7 +2697,7 @@ function RenewInner() {
           const cc = getPillarColors(cat.name).fire;
           const accentCSS = `rgb(${cc[0]}, ${cc[1]}, ${cc[2]})`;
           return (
-          <button className="renew-btn-tap" key={i} onClick={() => { setSelectedCategory(cat); setScreen("pick-passage"); }} style={{
+          <button className="renew-btn-tap" key={i} onClick={(e) => { e.currentTarget.blur(); setSelectedCategory(cat); setScreen("pick-passage"); }} style={{
             ...card, cursor: "pointer", display: "flex", alignItems: "center", gap: 14,
             textAlign: "left", position: "relative", overflow: "hidden", padding: "18px 18px 18px 22px",
             borderLeft: `3px solid ${accentCSS}`,
@@ -2750,7 +2753,7 @@ function RenewInner() {
           const saved = passageNetworksRef.current[getPassageKey(p)];
           const hasSaved = !!saved;
           return (
-            <button className="renew-btn-tap" key={i} onClick={() => { setSelectedPassage(p); startListening(p); }} style={{
+            <button className="renew-btn-tap" key={i} onClick={(e) => { e.currentTarget.blur(); setSelectedPassage(p); startListening(p); }} style={{
               ...card, cursor: "pointer", textAlign: "left",
               borderLeft: `3px solid ${pillarAccentCSS}`,
               padding: "16px 16px 16px 20px",
