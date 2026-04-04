@@ -2537,13 +2537,13 @@ function RenewInner() {
       {/* ── Glass card: fades in after 2.5s delay so user sees the neural network first ── */}
       <div style={{
         display: "flex", flexDirection: "column", alignItems: "center",
-        background: "rgba(8, 6, 18, 0.55)",
-        backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)",
-        border: "1px solid rgba(124, 106, 255, 0.08)",
+        background: "rgba(6, 4, 15, 0.78)",
+        backdropFilter: "blur(24px) saturate(1.2)", WebkitBackdropFilter: "blur(24px) saturate(1.2)",
+        border: "1px solid rgba(124, 106, 255, 0.1)",
         borderRadius: 22,
         padding: "36px 32px 32px",
         maxWidth: 340, width: "100%",
-        boxShadow: "0 8px 40px rgba(0,0,0,0.4), 0 0 80px rgba(124,106,255,0.04), inset 0 1px 0 rgba(255,255,255,0.03)",
+        boxShadow: "0 8px 40px rgba(0,0,0,0.5), 0 0 80px rgba(124,106,255,0.05), inset 0 1px 0 rgba(255,255,255,0.04)",
         animation: "renewGlassReveal 1.4s cubic-bezier(0.22, 1, 0.36, 1) both",
         animationDelay: "2.5s",
       }}>
