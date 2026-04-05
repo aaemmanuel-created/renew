@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, Component } from "react";
 import * as Tone from "tone";
 import { auth, googleProvider, db } from "./firebase";
-import { onAuthStateChanged, signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "firebase/auth";
+import { onAuthStateChanged, signInWithPopup, signInWithRedirect, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 
 // ─── Simplex 2D Noise (lightweight, no library) ───
@@ -48,6 +48,7 @@ class RenewErrorBoundary extends Component {
           background: "#000", color: "#E8E8E8", width: "100%", height: "100vh",
           display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
           fontFamily: "'JetBrains Mono', monospace", textAlign: "center", padding: 32,
+          zIndex: 10000, position: "fixed", inset: 0, // #20 fix: render above splash
         }}>
           <div style={{ fontSize: 13, letterSpacing: 6, fontWeight: 700, marginBottom: 16 }}>RENEW</div>
           <div style={{ fontSize: 12, color: "#888", marginBottom: 24, lineHeight: 1.6 }}>
@@ -908,6 +909,8 @@ function fireNeuron(state, neuron, sMap, ripplesRef, growthParticlesRef) {
     // Cap ripples pool
     if (ripplesRef.current.length > 20) ripplesRef.current.shift();
   }
+  // #26 fix: Subtle haptic on neuron fire (only during session)
+  try { if (navigator.vibrate) navigator.vibrate(5); } catch {}
 }
 
 function fmtTime(s) { const m = Math.floor(s / 60); const sec = s % 60; return m > 0 ? `${m}m ${sec}s` : `${sec}s`; }
@@ -963,6 +966,9 @@ function RenewInner() {
   const [totalTime, setTotalTime] = useState(0);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [permissionDenied, setPermissionDenied] = useState(false);
+  const [cloudSaveError, setCloudSaveError] = useState(""); // #6 fix: toast for save failures
+  const [dataLoading, setDataLoading] = useState(true); // #17 fix: loading state for Firestore data
+  const [signOutConfirm, setSignOutConfirm] = useState(false); // #27 fix: sign-out confirmation
 
   // ─── Authentication ───
   const [user, setUser] = useState(null);
@@ -1001,8 +1007,23 @@ function RenewInner() {
   const isFirstTime = sessionHistory.length === 0 && lifetimeSeconds === 0;
 
   // ─── Cloud Sync: Load data from Firestore on login ───
+  // #3 fix: Load from localStorage first for offline resilience, then overwrite with Firestore
   useEffect(() => {
     if (!user || dataLoadedRef.current) return;
+    // Phase 1: Restore from localStorage immediately (offline backup)
+    try {
+      const localBackup = localStorage.getItem(`renew_backup_${user.uid}`);
+      if (localBackup) {
+        const d = JSON.parse(localBackup);
+        if (d.sessionHistory) setSessionHistory(d.sessionHistory);
+        if (d.currentStreak !== undefined) setCurrentStreak(d.currentStreak);
+        if (d.longestStreak !== undefined) setLongestStreak(d.longestStreak);
+        if (d.lifetimeSeconds !== undefined) setLifetimeSeconds(d.lifetimeSeconds);
+        if (d.lifetimeNeurons !== undefined) setLifetimeNeurons(d.lifetimeNeurons);
+        if (d.passageNetworks) passageNetworksRef.current = d.passageNetworks;
+      }
+    } catch (e) { console.warn("localStorage restore failed:", e); }
+    // Phase 2: Overwrite with Firestore (authoritative source)
     const loadCloud = async () => {
       try {
         const snap = await getDoc(doc(db, "users", user.uid));
@@ -1016,36 +1037,72 @@ function RenewInner() {
           if (d.passageNetworks) passageNetworksRef.current = d.passageNetworks;
         }
         dataLoadedRef.current = true;
+        setDataLoading(false);
       } catch (e) {
         console.warn("Cloud load failed, using local state:", e);
         dataLoadedRef.current = true;
+        setDataLoading(false);
       }
     };
     loadCloud();
   }, [user]);
 
+  // #3 fix: Mirror data to localStorage on every cloud save cycle
+  useEffect(() => {
+    if (!user || !dataLoadedRef.current) return;
+    try {
+      const backup = JSON.stringify({
+        sessionHistory, currentStreak, longestStreak, lifetimeSeconds, lifetimeNeurons,
+        passageNetworks: passageNetworksRef.current,
+      });
+      localStorage.setItem(`renew_backup_${user.uid}`, backup);
+    } catch (e) { /* localStorage might be full — fail silently */ }
+  }, [user, sessionHistory, currentStreak, longestStreak, lifetimeSeconds, lifetimeNeurons]);
+
   // ─── Cloud Sync: Save data to Firestore (debounced) ───
+  // #2 fix: Write queue with immediate save for critical transitions
+  const cloudSaveQueueRef = useRef([]); // pending save queue
+  const cloudSavingRef = useRef(false); // lock to prevent concurrent writes
+  const _doCloudWrite = useCallback(async () => {
+    if (!user || !dataLoadedRef.current || cloudSavingRef.current) return;
+    cloudSavingRef.current = true;
+    try {
+      await setDoc(doc(db, "users", user.uid), {
+        sessionHistory,
+        currentStreak,
+        longestStreak,
+        lifetimeSeconds,
+        lifetimeNeurons,
+        passageNetworks: passageNetworksRef.current,
+        lastSaved: new Date().toISOString(),
+        email: user.email || "",
+      }, { merge: true });
+    } catch (e) {
+      console.warn("Cloud save failed:", e);
+      // #6 fix: Show toast on save failure (sets a state we'll add)
+      setCloudSaveError("Couldn't save — will retry");
+      setTimeout(() => setCloudSaveError(""), 4000);
+    }
+    cloudSavingRef.current = false;
+    // Process queued writes
+    if (cloudSaveQueueRef.current.length > 0) {
+      cloudSaveQueueRef.current.shift();
+      _doCloudWrite();
+    }
+  }, [user, sessionHistory, currentStreak, longestStreak, lifetimeSeconds, lifetimeNeurons]);
+
   const saveToCloud = useCallback(() => {
     if (!user || !dataLoadedRef.current) return;
-    // Debounce: wait 3s after last change before writing
     if (cloudSaveTimer.current) clearTimeout(cloudSaveTimer.current);
-    cloudSaveTimer.current = setTimeout(async () => {
-      try {
-        await setDoc(doc(db, "users", user.uid), {
-          sessionHistory,
-          currentStreak,
-          longestStreak,
-          lifetimeSeconds,
-          lifetimeNeurons,
-          passageNetworks: passageNetworksRef.current,
-          lastSaved: new Date().toISOString(),
-          email: user.email || "",
-        }, { merge: true });
-      } catch (e) {
-        console.warn("Cloud save failed:", e);
-      }
-    }, 3000);
-  }, [user, sessionHistory, currentStreak, longestStreak, lifetimeSeconds, lifetimeNeurons]);
+    cloudSaveTimer.current = setTimeout(() => _doCloudWrite(), 3000);
+  }, [user, _doCloudWrite]);
+
+  // #2 fix: Immediate save for critical transitions (session end, sign out)
+  const immediateCloudSave = useCallback(async () => {
+    if (!user || !dataLoadedRef.current) return;
+    if (cloudSaveTimer.current) clearTimeout(cloudSaveTimer.current);
+    await _doCloudWrite();
+  }, [user, _doCloudWrite]);
 
   // Trigger cloud save whenever key data changes
   useEffect(() => {
@@ -1078,15 +1135,20 @@ function RenewInner() {
     } else {
       let streak = 1;
       for (let i = dates.length - 1; i > 0; i--) {
-        const curr = new Date(dates[i] + 'T00:00:00');
-        const prev = new Date(dates[i - 1] + 'T00:00:00');
+        // #7 fix: timezone-safe date parsing
+        const currParts = dates[i].split('-').map(Number);
+        const prevParts = dates[i - 1].split('-').map(Number);
+        const curr = new Date(currParts[0], currParts[1] - 1, currParts[2]);
+        const prev = new Date(prevParts[0], prevParts[1] - 1, prevParts[2]);
         const diff = Math.round((curr - prev) / (1000 * 60 * 60 * 24));
         if (diff === 1) streak++;
         else break;
       }
       // Only count streak if the most recent date is today or yesterday
-      const lastDate = new Date(dates[dates.length - 1] + 'T00:00:00');
-      const today = new Date(new Date().toISOString().slice(0, 10) + 'T00:00:00');
+      const lastParts = dates[dates.length - 1].split('-').map(Number);
+      const lastDate = new Date(lastParts[0], lastParts[1] - 1, lastParts[2]);
+      const now7b = new Date();
+      const today = new Date(now7b.getFullYear(), now7b.getMonth(), now7b.getDate());
       const daysSinceLast = Math.round((today - lastDate) / (1000 * 60 * 60 * 24));
       if (daysSinceLast > 1) streak = 0;
       setCurrentStreak(streak);
@@ -1095,10 +1157,24 @@ function RenewInner() {
   }, [sessionHistory]);
 
   // ─── Auth helpers ───
+  // #10 fix: Use signInWithRedirect in iOS PWA standalone mode where popups are blocked
   const handleGoogleSignIn = async () => {
     setAuthError(""); setAuthBusy(true);
-    try { await signInWithPopup(auth, googleProvider); }
-    catch (e) { setAuthError(e.message); }
+    try {
+      const isStandalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
+      if (isStandalone) {
+        await signInWithRedirect(auth, googleProvider);
+      } else {
+        await signInWithPopup(auth, googleProvider);
+      }
+    } catch (e) {
+      // Provide user-friendly error messages instead of raw Firebase errors
+      const msg = e.code === "auth/popup-blocked" ? "Popup was blocked. Try again or use email sign-in."
+        : e.code === "auth/popup-closed-by-user" ? "Sign-in cancelled."
+        : e.code === "auth/cancelled-popup-request" ? "Sign-in cancelled."
+        : "Sign-in failed. Please try again or use email.";
+      setAuthError(msg);
+    }
     setAuthBusy(false);
   };
 
@@ -1123,6 +1199,12 @@ function RenewInner() {
   };
 
   const handleSignOut = async () => {
+    // #27 fix: Require confirmation (signOutConfirm state check)
+    if (!signOutConfirm) {
+      setSignOutConfirm(true);
+      return;
+    }
+    setSignOutConfirm(false);
     // Save before signing out
     if (user && dataLoadedRef.current) {
       try {
@@ -1355,21 +1437,21 @@ function RenewInner() {
     }
   }, []);
 
+  // #5 fix: Track disposal state, dispose synchronously, don't swallow errors silently
+  const toneDisposingRef = useRef(false);
   const disposeTone = useCallback(() => {
-    if (toneRef.current) {
+    if (toneRef.current && !toneDisposingRef.current) {
+      toneDisposingRef.current = true;
       const t = toneRef.current;
-      try { t.drone.triggerRelease(); } catch {}
+      toneRef.current = null; // prevent double-dispose
+      try { t.drone.triggerRelease(); } catch (e) { console.warn("Tone drone release:", e); }
       setTimeout(() => {
-        try {
-          t.drone.dispose();
-          t.fireSynth.dispose();
-          t.connectSynth.dispose();
-          t.spawnSynth.dispose();
-          t.delay.dispose();
-          t.rev.dispose();
-        } catch {}
-        toneRef.current = null;
-      }, 3000); // let release tails fade
+        const synths = [t.drone, t.fireSynth, t.connectSynth, t.spawnSynth, t.delay, t.rev];
+        for (const s of synths) {
+          try { if (s && !s.disposed) s.dispose(); } catch (e) { console.warn("Tone dispose:", e); }
+        }
+        toneDisposingRef.current = false;
+      }, 1500); // shorter delay — 1.5s is enough for tails
     }
   }, []);
 
@@ -1379,7 +1461,9 @@ function RenewInner() {
     const c = canvasRef.current;
     if (c) {
       const dpr = window.devicePixelRatio || 1;
-      stateRef.current = loadOrCreateNetwork(p, c.width / dpr, c.height / dpr, selectedCategory?.name);
+      // #21 fix: Custom passages get a dedicated "CUSTOM" pillar color (falls back to DEFAULT which is gold-ish)
+      const pillarName = selectedCategory?.name || 'DEFAULT';
+      stateRef.current = loadOrCreateNetwork(p, c.width / dpr, c.height / dpr, pillarName);
       setNeuronCount(stateRef.current.neurons.length);
       setSynapseCount(stateRef.current.synapses.length);
       setTotalTime(Math.floor(stateRef.current.totalSpeakTime || 0));
@@ -1410,9 +1494,23 @@ function RenewInner() {
 
   const stopListening = useCallback(() => {
     disposeTone();
+    // #1 fix: Disconnect all audio nodes before closing context to prevent iOS accumulation
+    try {
+      if (analyserRef.current) {
+        analyserRef.current.disconnect();
+        analyserRef.current = null;
+      }
+    } catch {}
     streamRef.current?.getTracks().forEach(t => t.stop()); streamRef.current = null;
-    audioCtxRef.current?.close(); audioCtxRef.current = null; analyserRef.current = null;
+    try {
+      if (audioCtxRef.current && audioCtxRef.current.state !== 'closed') {
+        audioCtxRef.current.close();
+      }
+    } catch {}
+    audioCtxRef.current = null;
     setIsListening(false); setIsSpeaking(false); setVolume(0);
+    volumeRef.current = 0;
+    isSpeakingRef.current = false;
   }, [disposeTone]);
 
   const playEndSound = useCallback(() => {
@@ -1449,10 +1547,16 @@ function RenewInner() {
     // Save this passage's neural network state
     saveCurrentNetwork();
     stopListening();
+    // #26 fix: Haptic feedback on session end
+    try { if (navigator.vibrate) navigator.vibrate(10); } catch {}
     if (dur >= 5) {
-      const today = new Date().toISOString().slice(0, 10);
+      // #7 fix: Use local date consistently to avoid timezone boundary errors
+      const now7 = new Date();
+      const today = `${now7.getFullYear()}-${String(now7.getMonth() + 1).padStart(2, '0')}-${String(now7.getDate()).padStart(2, '0')}`;
       const ref = selectedPassage ? selectedPassage.ref : (customRef || "Custom");
-      setSessionHistory(prev => [...prev, { date: today, ref, duration: dur, neurons: nc, pathways: pc, grew }]);
+      // #22 fix: Store pillar name alongside ref for future-proof color lookup
+      const pillarName = selectedCategory?.name || 'CUSTOM';
+      setSessionHistory(prev => [...prev, { date: today, ref, pillar: pillarName, duration: dur, neurons: nc, pathways: pc, grew }]);
       setLifetimeSeconds(prev => prev + dur); setLifetimeNeurons(prev => prev + nc);
       // Streak logic: count unique calendar days, not sessions
       // Find the most recent session date from history (before this session)
@@ -1463,8 +1567,11 @@ function RenewInner() {
         // Check if last session was yesterday (continue streak) or older (reset to 1)
         let newStreak = 1;
         if (lastSessionDate) {
-          const lastDate = new Date(lastSessionDate + 'T00:00:00');
-          const todayDate = new Date(today + 'T00:00:00');
+          // #7 fix: timezone-safe date parsing
+          const lastParts = lastSessionDate.split('-').map(Number);
+          const todayParts = today.split('-').map(Number);
+          const lastDate = new Date(lastParts[0], lastParts[1] - 1, lastParts[2]);
+          const todayDate = new Date(todayParts[0], todayParts[1] - 1, todayParts[2]);
           const diffDays = Math.round((todayDate - lastDate) / (1000 * 60 * 60 * 24));
           if (diffDays === 1) newStreak = currentStreak + 1; // consecutive day
           else if (diffDays === 0) newStreak = currentStreak; // same day (shouldn't reach here)
@@ -1474,8 +1581,10 @@ function RenewInner() {
       }
       // If alreadyToday, streak stays the same — no increment for multiple sessions per day
       setScreen("summary");
+      // #2 fix: Immediate save for critical transitions
+      immediateCloudSave();
     } else { setScreen(selectedCategory ? "pick-passage" : "home"); }
-  }, [totalTime, neuronCount, synapseCount, selectedPassage, selectedCategory, customRef, stopListening, saveCurrentNetwork, currentStreak, longestStreak, sessionHistory, disposeTone, playEndSound]);
+  }, [totalTime, neuronCount, synapseCount, selectedPassage, selectedCategory, customRef, stopListening, saveCurrentNetwork, currentStreak, longestStreak, sessionHistory, disposeTone, playEndSound, immediateCloudSave]);
 
   // ─── Swipe-back navigation ───
   const goBack = useCallback(() => {
@@ -1498,8 +1607,10 @@ function RenewInner() {
   const goBackRef = useRef(goBack);
   goBackRef.current = goBack;
 
+  // #28 fix: Only enable custom swipe in standalone PWA mode to avoid conflicting with Safari's native back gesture
+  const isStandaloneRef = useRef(typeof window !== 'undefined' && (window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches));
   const handleTouchStart = useCallback((e) => {
-    // Always capture the start position — we check canSwipeBack on end
+    if (!isStandaloneRef.current && e.touches[0].clientX < 30) return; // let Safari handle edge swipes
     const touch = e.touches[0];
     touchStartRef.current = { x: touch.clientX, y: touch.clientY, time: Date.now() };
   }, []);
@@ -1628,8 +1739,9 @@ function RenewInner() {
         if (aq.frameTimes.length > 60) aq.frameTimes.shift();
         if (aq.frameTimes.length >= 30) {
           const avg = aq.frameTimes.reduce((a, b) => a + b, 0) / aq.frameTimes.length;
-          if (avg > 20 && aq.level > 0.5) aq.level = 0.5; // degrade quality
-          else if (avg < 14 && aq.level < 1) aq.level = 1; // restore quality
+          // #11 fix: Symmetric thresholds with gradual recovery
+          if (avg > 20 && aq.level > 0.5) aq.level = Math.max(0.5, aq.level - 0.1);
+          else if (avg < 18 && aq.level < 1) aq.level = Math.min(1, aq.level + 0.05);
         }
       }
       aq._lastFrame = now;
@@ -1664,7 +1776,8 @@ function RenewInner() {
       }
       const spk = vol > 0.08;
       // Bug 4+9 fix: use refs to avoid stale closures, lower threshold for smoother waveform
-      if (Math.abs(vol - volumeRef.current) > 0.001) {
+      // #14 fix: Higher threshold to reduce unnecessary re-renders (~60fps → ~10fps state updates)
+      if (Math.abs(vol - volumeRef.current) > 0.03) {
         volumeRef.current = vol;
         setVolume(vol);
       }
@@ -1854,6 +1967,8 @@ function RenewInner() {
         n.pulsePhase += 0.006;     // very slow breathing
         n.energy = Math.max(0.08, n.energy - 0.00005);
       }
+      // #12 fix: Prevent infinite cascade loops — track neurons fired this frame
+      const _firedThisFrame = new Set();
       for (const s of st.synapses) {
         // Animate synapse formation — "reaching moment"
         if (s.forming) {
@@ -1876,7 +1991,8 @@ function RenewInner() {
             if (target && !s.forming) { // only if synapse is fully formed
               // Cascade: receiving neuron fires at reduced intensity
               const cascadeStrength = s.strength * 0.5; // weaker cascade based on synapse strength
-              if (Math.random() < cascadeStrength && target.fireLevel < 0.3) {
+              if (Math.random() < cascadeStrength && target.fireLevel < 0.3 && !_firedThisFrame.has(target.id)) {
+                _firedThisFrame.add(target.id);
                 target.fireLevel = Math.min(0.8, target.fireLevel + 0.35);
                 target.totalFired++;
                 target.energy = Math.min(1, target.energy + 0.001);
@@ -2376,6 +2492,8 @@ function RenewInner() {
 
       // ── Shockwave ripples ──
       for (const rp of ripplesRef.current) {
+        // #16 fix: Skip rendering ripples that are entirely off-screen
+        if (rp.x + rp.radius < 0 || rp.x - rp.radius > w || rp.y + rp.radius < 0 || rp.y - rp.radius > h) continue;
         ctx.strokeStyle = `rgba(170, 180, 255, ${rp.opacity * 0.6})`;
         ctx.lineWidth = 1.5;
         ctx.beginPath(); ctx.arc(rp.x, rp.y, rp.radius, 0, Math.PI * 2); ctx.stroke();
@@ -2406,8 +2524,9 @@ function RenewInner() {
 
       // ── Layer 8: Sensor noise + scan lines — offscreen cached ──
       if (!reducedMotion) {
-        // Sensor noise: refresh every 3rd frame
-        if (!noiseCanvasRef.current || offscreenFrameRef.current % 3 === 0) {
+        // Sensor noise: refresh every 8th frame
+        // #25 fix: Refresh noise less often — barely perceptible at 0.015 opacity
+        if (!noiseCanvasRef.current || offscreenFrameRef.current % 8 === 0) {
           const nOff = noiseCanvasRef.current || document.createElement('canvas');
           nOff.width = Math.round(w * dpr); nOff.height = Math.round(h * dpr);
           const nCtx = nOff.getContext('2d');
@@ -2513,6 +2632,18 @@ function RenewInner() {
     textTransform: "uppercase", fontFamily: FONT, marginTop: 4,
   };
 
+  // #30 fix: "What's New" version toast
+  const [showVersionToast, setShowVersionToast] = useState(false);
+  useEffect(() => {
+    const currentVersion = 'v2026.04.05a';
+    const lastVersion = localStorage.getItem('renew_last_version');
+    if (lastVersion && lastVersion !== currentVersion) {
+      setShowVersionToast(true);
+      setTimeout(() => setShowVersionToast(false), 4000);
+    }
+    localStorage.setItem('renew_last_version', currentVersion);
+  }, []);
+
   // ─── SCREENS ───
 
   const renderHome = () => (
@@ -2546,10 +2677,13 @@ function RenewInner() {
       {/* Sign out — top right, subtle (always visible immediately) */}
       <button onClick={handleSignOut} style={{
         position: "absolute", top: "max(20px, env(safe-area-inset-top, 20px))", right: "max(22px, env(safe-area-inset-right, 22px))",
-        background: "none", border: "none", color: P.textDim, fontSize: 9,
-        cursor: "pointer", fontFamily: FONT, letterSpacing: 1, padding: "4px 0",
-        transition: "color 0.3s", zIndex: 2,
-      }}>SIGN OUT</button>
+        background: signOutConfirm ? "rgba(239,68,68,0.15)" : "none",
+        border: signOutConfirm ? "1px solid rgba(239,68,68,0.3)" : "none",
+        borderRadius: signOutConfirm ? 8 : 0,
+        color: signOutConfirm ? P.danger : P.textDim, fontSize: 9,
+        cursor: "pointer", fontFamily: FONT, letterSpacing: 1, padding: signOutConfirm ? "4px 10px" : "4px 0",
+        transition: "all 0.3s", zIndex: 2,
+      }}>{signOutConfirm ? "CONFIRM?" : "SIGN OUT"}</button>
 
       {/* ── Glass card: fades in after 2.5s delay so user sees the neural network first ── */}
       <div style={{
@@ -2601,7 +2735,11 @@ function RenewInner() {
           }} />
         </div>
 
-        {isFirstTime ? (
+        {dataLoading && !dataLoadedRef.current ? (
+          <div style={{ textAlign: "center" }}>
+            <p style={{ color: P.textDim, fontSize: 12, fontFamily: FONT_BODY, fontWeight: 300 }}>Loading your data...</p>
+          </div>
+        ) : isFirstTime ? (
           <div style={{ textAlign: "center" }}>
             <p style={{
               color: P.textSoft, fontSize: 14, fontWeight: 300, textAlign: "center",
@@ -2830,8 +2968,9 @@ function RenewInner() {
       </div>
       <div style={{ marginBottom: 28 }}>
         <div style={{ ...labelStyle, marginBottom: 8 }}>Scripture text</div>
-        <textarea className="renew-input" value={customText} onChange={e => setCustomText(e.target.value)}
+        <textarea className="renew-input" value={customText} onChange={e => setCustomText(e.target.value.slice(0, 2000))}
           placeholder="Type or paste the Scripture here..."
+          maxLength={2000}
           rows={6}
           style={{
             width: "100%", boxSizing: "border-box",
@@ -2840,6 +2979,9 @@ function RenewInner() {
             fontFamily: FONT_BODY, outline: "none", resize: "vertical", lineHeight: 1.85, fontWeight: 300,
             transition: "border-color 0.3s, box-shadow 0.3s",
           }} />
+        <div style={{ textAlign: "right", color: customText.length > 1800 ? P.danger : P.textDim, fontSize: 9, fontFamily: FONT, marginTop: 4 }}>
+          {customText.length}/2000
+        </div>
       </div>
 
       <button className="renew-btn-tap"
@@ -3038,13 +3180,30 @@ function RenewInner() {
           WebkitTapHighlightColor: "transparent",
           backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)",
         }}>END</button>
+
+        {permissionDenied && (
+          <div style={{
+            position: "absolute", top: "50%", left: 20, right: 20, transform: "translateY(-50%)",
+            zIndex: 15, textAlign: "center", fontFamily: FONT,
+          }}>
+            <div style={{ color: P.danger, fontSize: 13, fontWeight: 600, marginBottom: 8 }}>
+              Microphone access denied
+            </div>
+            <div style={{ color: P.textSoft, fontSize: 11, lineHeight: 1.6, fontFamily: FONT_BODY, marginBottom: 16 }}>
+              On iOS: Settings → Safari → Microphone → Allow
+            </div>
+            <button className="renew-btn-tap" onClick={() => { setPermissionDenied(false); startListening(selectedPassage); }} style={{
+              ...btnGhost, borderColor: P.accent, color: P.accent,
+            }}>Try Again</button>
+          </div>
+        )}
       </div>
 
       {/* Vignette — pulses with voice when speaking, dims to quiet anticipation when listening */}
       <div style={{
         position: "absolute", inset: 0, pointerEvents: "none", zIndex: 5,
         boxShadow: isSpeaking
-          ? `inset 0 0 ${60 + volume * 100}px rgba(${sessionPillarUI.fire[0]}, ${sessionPillarUI.fire[1]}, ${sessionPillarUI.fire[2]}, ${0.02 + volume * 0.12})`
+          ? `inset 0 0 ${Math.min(60 + volume * 100, Math.min(window.innerWidth, window.innerHeight) * 0.4)}px rgba(${sessionPillarUI.fire[0]}, ${sessionPillarUI.fire[1]}, ${sessionPillarUI.fire[2]}, ${0.02 + volume * 0.12})`
           : "inset 0 0 120px rgba(0,0,0,0.4)",
         transition: isSpeaking ? "box-shadow 0.15s ease-out" : "box-shadow 1.5s ease-in-out",
         opacity: isSpeaking ? 1 : 0.8,
@@ -3157,7 +3316,9 @@ function RenewInner() {
             <div>
               <div style={{ color: P.streak, fontSize: 13, fontWeight: 700, fontFamily: FONT, animation: "renewStreakFlicker 3s ease-in-out infinite", display: "flex", alignItems: "center", gap: 5 }}>
                 {currentStreak} day streak
-                <span style={{ fontSize: 10, lineHeight: 1 }}>{"\u{1F525}"}</span>
+                <span style={{ display: "inline-flex", width: 14, height: 14, alignItems: "center", justifyContent: "center" }}>
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M8 1C8 1 3 6 3 10a5 5 0 0 0 10 0c0-4-5-9-5-9z" fill="#FB923C" opacity="0.9"/><path d="M8 6c0 0-2 2.5-2 4.5a2 2 0 0 0 4 0c0-2-2-4.5-2-4.5z" fill="#FDE68A"/></svg>
+                </span>
               </div>
               <div style={{ color: P.textDim, fontSize: 9, fontFamily: FONT }}>best: {longestStreak} days</div>
             </div>
@@ -3237,9 +3398,9 @@ function RenewInner() {
           }} />
         )}
         {[...sessionHistory].reverse().map((s, i) => {
-          // Find pillar color from passage reference
-          const pillarCat = SCRIPTURE_CATEGORIES.find(c => c.passages.some(p => p.ref === s.ref));
-          const pc = pillarCat ? getPillarColors(pillarCat.name).fire : [124, 106, 255];
+          // #22 fix: Use stored pillar name first, fall back to lookup
+          const pillarCat = s.pillar ? null : SCRIPTURE_CATEGORIES.find(c => c.passages.some(p => p.ref === s.ref));
+          const pc = s.pillar ? getPillarColors(s.pillar).fire : (pillarCat ? getPillarColors(pillarCat.name).fire : [124, 106, 255]);
           const refColor = `rgb(${pc[0]}, ${pc[1]}, ${pc[2]})`;
           const isConfirming = confirmResetIdx === i;
           return (
@@ -3454,7 +3615,7 @@ function RenewInner() {
             position: "fixed", bottom: 4, right: 8,
             fontSize: 8, color: "#222", fontFamily: "monospace",
             pointerEvents: "none", zIndex: 9999,
-          }}>v2026.04.04a</div>
+          }}>v2026.04.05a</div>
         </div>
       );
     }
@@ -3658,7 +3819,29 @@ function RenewInner() {
           position: "fixed", bottom: 4, right: 8,
           fontSize: 8, color: "#222", fontFamily: "monospace",
           pointerEvents: "none", zIndex: 9999,
-        }}>v2026.04.04a</div>
+        }}>v2026.04.05a</div>
+      )}
+      {/* #6 fix: Cloud save error toast */}
+      {cloudSaveError && (
+        <div style={{
+          position: "fixed", top: "max(16px, env(safe-area-inset-top, 16px))", left: "50%", transform: "translateX(-50%)",
+          background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.3)",
+          borderRadius: 10, padding: "8px 20px", zIndex: 9998,
+          color: P.danger, fontSize: 11, fontFamily: FONT, letterSpacing: 0.5,
+          animation: "renewFadeIn 0.4s ease both",
+          backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
+        }}>{cloudSaveError}</div>
+      )}
+      {/* #30 fix: Version update toast */}
+      {showVersionToast && (
+        <div style={{
+          position: "fixed", bottom: "max(24px, env(safe-area-inset-bottom, 24px))", left: "50%", transform: "translateX(-50%)",
+          background: "rgba(124,106,255,0.12)", border: "1px solid rgba(124,106,255,0.2)",
+          borderRadius: 10, padding: "8px 20px", zIndex: 9998,
+          color: P.accent, fontSize: 11, fontFamily: FONT, letterSpacing: 0.5,
+          animation: "renewFadeIn 0.4s ease both",
+          backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
+        }}>Updated to v2026.04.05a</div>
       )}
       {/* Loading state — logo dot materializes then dissolves smoothly into canvas */}
       {!appLoaded && (

@@ -7,19 +7,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
   <Renew />
 )
 
-// Bug 1 fix: Unregister all service workers (old SW was caching stale builds)
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.getRegistrations().then(registrations => {
-    registrations.forEach(r => r.unregister());
-  });
-}
-
-// Fix 6: Clear orphaned caches (renew-v1 etc.) that persist after SW self-destruct
-if (window.caches) {
-  caches.keys().then(names => {
-    names.forEach(name => caches.delete(name));
-  });
-}
+// #24 fix: Removed duplicate SW/cache clearing — already runs in index.html inline script (earliest possible)
 
 // Bug 6 fix: Check for app updates (PWA cache-busting on iPhone)
 if (navigator.onLine) {
