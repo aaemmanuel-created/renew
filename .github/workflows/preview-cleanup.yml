@@ -1,0 +1,56 @@
+# .github/workflows/preview-cleanup.yml — shared template
+#
+# When a PR closes (merged or abandoned), delete the matching
+# preview/<branch-slug>/ folder from the corresponding previews repo
+# so previews don't accumulate forever.
+#
+# Each app's instance points at its own previews repo via env vars below.
+# Adjust PREVIEWS_REPO_OWNER and PREVIEWS_REPO_NAME per app before committing.
+
+name: preview-cleanup
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: read
+
+env:
+  # CHANGE THESE per app when you install this workflow:
+  PREVIEWS_REPO_OWNER: aaemmanuel-created
+  PREVIEWS_REPO_NAME: renew-previews        # renew-previews | pillar-previews | burden-previews
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Compute branch slug
+        id: slug
+        run: |
+          BRANCH="${{ github.event.pull_request.head.ref }}"
+          SLUG="$(echo "$BRANCH" | tr '/_' '--' | tr -cd 'a-zA-Z0-9-' | tr 'A-Z' 'a-z')"
+          echo "value=$SLUG" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout previews repo (gh-pages branch)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.PREVIEWS_REPO_OWNER }}/${{ env.PREVIEWS_REPO_NAME }}
+          ref: gh-pages
+          token: ${{ secrets.PREVIEW_DEPLOY_TOKEN }}
+          fetch-depth: 1
+
+      - name: Remove preview folder
+        env:
+          SLUG: ${{ steps.slug.outputs.value }}
+        run: |
+          if [ -d "preview/$SLUG" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            rm -rf "preview/$SLUG"
+            git add -A
+            git commit -m "cleanup: prune preview/$SLUG (PR #${{ github.event.pull_request.number }} closed in ${{ github.repository }})"
+            git push origin gh-pages
+          else
+            echo "No preview folder for $SLUG; nothing to clean."
+          fi
