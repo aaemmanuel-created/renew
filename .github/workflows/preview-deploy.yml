@@ -51,7 +51,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: 'npm'
 
       - name: Compute branch slug
         id: slug
@@ -61,7 +60,7 @@ jobs:
           echo "value=$SLUG" >> "$GITHUB_OUTPUT"
 
       - name: Install
-        run: npm ci --ignore-scripts
+        run: npm install --no-audit --no-fund --ignore-scripts
 
       - name: Build (with preview base path)
         env:
