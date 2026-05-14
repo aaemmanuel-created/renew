@@ -1,0 +1,116 @@
+# .github/workflows/preview-deploy.yml — RENEW
+#
+# Builds the Vite/React web app on every push to a feature-style branch and
+# publishes the result to a SEPARATE previews repo (renew-previews) so the
+# production deploy at aaemmanuel-created.github.io/renew/ stays untouched.
+#
+# Prerequisites in the RENEW repo:
+#   1. A previews repo at <owner>/renew-previews exists with GH Pages enabled
+#      (Source: gh-pages branch, root). See _workflow/GITHUB-PAGES-PREVIEW-SETUP.md.
+#   2. Secrets:
+#        PREVIEW_DEPLOY_TOKEN — fine-scoped PAT with `contents:write` on the
+#                               previews repo only.
+#      Plus the existing VITE_FIREBASE_* secrets used by deploy.yml.
+#
+# Drop at .github/workflows/preview-deploy.yml in the RENEW repo.
+
+name: preview-deploy
+
+on:
+  push:
+    branches:
+      - 'feature/**'
+      - 'fix/**'
+      - 'chore/**'
+      - 'bugfix/**'
+      - 'docs/**'
+      - 'refactor/**'
+      - 'wip/**'
+
+concurrency:
+  group: preview-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+env:
+  PREVIEWS_REPO_OWNER: aaemmanuel-created      # change if your GitHub username differs
+  PREVIEWS_REPO_NAME: renew-previews
+  PREVIEWS_PAGES_HOST: aaemmanuel-created.github.io/renew-previews
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Compute branch slug
+        id: slug
+        run: |
+          BRANCH="${GITHUB_REF_NAME}"
+          SLUG="$(echo "$BRANCH" | tr '/_' '--' | tr -cd 'a-zA-Z0-9-' | tr 'A-Z' 'a-z')"
+          echo "value=$SLUG" >> "$GITHUB_OUTPUT"
+
+      - name: Install
+        run: npm install --no-audit --no-fund --ignore-scripts
+
+      - name: Build (with preview base path)
+        env:
+          PREVIEW_BASE: /renew-previews/preview/${{ steps.slug.outputs.value }}/
+          VITE_FIREBASE_API_KEY:           ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN:       ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID:        ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET:    ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID:            ${{ secrets.VITE_FIREBASE_APP_ID }}
+        run: npx vite build --base "$PREVIEW_BASE"
+
+      - name: Deploy to previews repo
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          personal_token: ${{ secrets.PREVIEW_DEPLOY_TOKEN }}
+          external_repository: ${{ env.PREVIEWS_REPO_OWNER }}/${{ env.PREVIEWS_REPO_NAME }}
+          publish_branch: gh-pages
+          publish_dir: ./dist
+          destination_dir: preview/${{ steps.slug.outputs.value }}
+          keep_files: true
+          commit_message: "preview: ${{ github.ref_name }} @ ${{ github.sha }}"
+
+      - name: Find associated PR
+        id: pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prs = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              head: `${context.repo.owner}:${context.ref.replace('refs/heads/', '')}`,
+            });
+            if (prs.data.length === 0) { core.setOutput('number', ''); return; }
+            core.setOutput('number', String(prs.data[0].number));
+
+      - name: Sticky PR comment with preview URL
+        if: steps.pr.outputs.number != ''
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          number: ${{ steps.pr.outputs.number }}
+          header: pva-preview
+          message: |
+            🔍 **Preview deploy ready**
+
+            Branch: `${{ github.ref_name }}`
+            URL: https://${{ env.PREVIEWS_PAGES_HOST }}/preview/${{ steps.slug.outputs.value }}/
+            Commit: ${{ github.sha }}
+
+            Preview lives in `${{ env.PREVIEWS_REPO_OWNER }}/${{ env.PREVIEWS_REPO_NAME }}` — production at `aaemmanuel-created.github.io/renew/` is untouched.
+
+            iOS/Android builds will not run until you reply `APPROVE NATIVE` in chat.
