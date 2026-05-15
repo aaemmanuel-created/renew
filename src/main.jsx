@@ -54,9 +54,16 @@ if (typeof window !== 'undefined' && new URLSearchParams(window.location.search)
 // #24 fix: Removed duplicate SW/cache clearing — already runs in index.html inline script (earliest possible)
 
 // Bug 6 fix: Check for app updates (PWA cache-busting on iPhone)
+// IMPORTANT: fetch the *current deploy's* index.html, not the production one.
+// Using `import.meta.env.BASE_URL` makes Vite bake the deploy-specific base at
+// build time — `/renew/` on production, `/renew-previews/preview/<branch>/`
+// on the preview workflow. Hard-coding `/renew/` here caused preview URLs to
+// fetch production index.html, see a different bundle hash, and reload in a
+// loop — which killed Sentry's transmit queue and prevented `?sentryTest=1`
+// from firing on previews.
 if (navigator.onLine) {
   setTimeout(() => {
-    fetch('/renew/index.html?_=' + Date.now(), { cache: 'no-store' })
+    fetch(import.meta.env.BASE_URL + 'index.html?_=' + Date.now(), { cache: 'no-store' })
       .then(r => r.text())
       .then(html => {
         const match = html.match(/assets\/index-([^.]+)\.js/);
