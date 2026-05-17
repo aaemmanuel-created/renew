@@ -1,0 +1,54 @@
+# PVA Auto-merge — feature-branch PRs land on main as soon as CI is green.
+#
+# Uses ONLY GitHub-shipped tooling — no third-party action, no SHA to pin,
+# no dependency to update. The `gh` CLI ships pre-installed on `ubuntu-latest`
+# runners, and `GITHUB_TOKEN` is auto-provided by GitHub.
+#
+# This file replaces the earlier version that used pascalgn/automerge-action,
+# which pinned an external action by tag (re-pointable) and ran with
+# `contents: write` permissions — too much trust for too small a job.
+#
+# Pairs with the dispatched-session workflow: sessions open PRs they can't
+# merge themselves (deny list blocks `gh pr merge`); the `auto-merge` label
+# is what tells CI to merge.
+
+name: Auto-merge labeled PRs
+
+on:
+  pull_request:
+    types: [labeled, opened, reopened, ready_for_review, synchronize]
+  pull_request_review:
+    types: [submitted]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+# Concurrency: cancel a previous run for the same PR if a newer event arrives.
+concurrency:
+  group: automerge-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  enable-automerge:
+    runs-on: ubuntu-latest
+    # Gate: PR must have `auto-merge`, must not be draft, must not have
+    # `do-not-merge` or `wip`. PR must come from inside this repo, not a fork,
+    # so we never auto-merge code we can't fully trust.
+    if: >
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      contains(github.event.pull_request.labels.*.name, 'auto-merge') &&
+      !contains(github.event.pull_request.labels.*.name, 'do-not-merge') &&
+      !contains(github.event.pull_request.labels.*.name, 'wip')
+    steps:
+      - name: Enable GitHub native auto-merge
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: |
+          # GitHub's built-in auto-merge: respects branch protection rules
+          # (required reviews, required checks, signed commits, CODEOWNERS).
+          # It will NOT merge until every protection rule is satisfied — so
+          # this step is safe as long as branch protection is configured on main.
+          gh pr merge --auto --squash --delete-branch "$PR_URL"
