@@ -2635,7 +2635,7 @@ function RenewInner() {
   // #30 fix: "What's New" version toast
   const [showVersionToast, setShowVersionToast] = useState(false);
   useEffect(() => {
-    const currentVersion = 'v2026.04.05a';
+    const currentVersion = 'v2026.05.15a';
     const lastVersion = localStorage.getItem('renew_last_version');
     if (lastVersion && lastVersion !== currentVersion) {
       setShowVersionToast(true);
@@ -3615,7 +3615,7 @@ function RenewInner() {
             position: "fixed", bottom: 4, right: 8,
             fontSize: 8, color: "#222", fontFamily: "monospace",
             pointerEvents: "none", zIndex: 9999,
-          }}>v2026.04.05a</div>
+          }}>v2026.05.15a</div>
         </div>
       );
     }
@@ -3819,7 +3819,7 @@ function RenewInner() {
           position: "fixed", bottom: 4, right: 8,
           fontSize: 8, color: "#222", fontFamily: "monospace",
           pointerEvents: "none", zIndex: 9999,
-        }}>v2026.04.05a</div>
+        }}>v2026.05.15a</div>
       )}
       {/* #6 fix: Cloud save error toast */}
       {cloudSaveError && (
@@ -3841,7 +3841,7 @@ function RenewInner() {
           color: P.accent, fontSize: 11, fontFamily: FONT, letterSpacing: 0.5,
           animation: "renewFadeIn 0.4s ease both",
           backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
-        }}>Updated to v2026.04.05a</div>
+        }}>Updated to v2026.05.15a</div>
       )}
       {/* Loading state — logo dot materializes then dissolves smoothly into canvas */}
       {!appLoaded && (
