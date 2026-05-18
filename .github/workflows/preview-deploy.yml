@@ -18,6 +18,10 @@ on:
       - 'docs/**'
       - 'refactor/**'
       - 'wip/**'
+      # AGENT-PUSH PREFIXES — claude.ai, Devin, Cursor agents.
+      - 'claude/**'
+      - 'devin/**'
+      - 'cursor/**'
 
 concurrency:
   group: preview-${{ github.ref }}
