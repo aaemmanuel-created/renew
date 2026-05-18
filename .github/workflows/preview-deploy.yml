@@ -1,33 +1,10 @@
-# .github/workflows/preview-deploy.yml — RENEW
+# Per-app caller for the reusable web preview deploy.
 #
-# Builds the Vite/React web app on every push to a feature-style branch and
-# publishes the result to a SEPARATE previews repo (renew-previews) so the
-# production deploy at aaemmanuel-created.github.io/renew/ stays untouched.
+# Drop this into each app repo at `.github/workflows/preview-deploy.yml`.
+# Replace the placeholders before pushing.
 #
-# Prerequisites in the RENEW repo:
-#   1. A previews repo at <owner>/renew-previews exists with GH Pages enabled
-#      (Source: gh-pages branch, root). See _workflow/GITHUB-PAGES-PREVIEW-SETUP.md.
-#   2. Secrets:
-#        PREVIEW_DEPLOY_TOKEN  — fine-scoped PAT with `contents:write` on the
-#                                previews repo only.
-#        PREVIEW_STABLE_SLUG   — 8-char random token (e.g. `openssl rand -hex 4`).
-#                                Defines the bookmarkable stable preview URL at
-#                                /preview/latest-<token>/. Set once per app,
-#                                never rotate (or you invalidate your phone
-#                                bookmark). See STABLE-PREVIEW-SETUP.md.
-#        SENTRY_AUTH_TOKEN     — org-scoped Sentry auth token used by
-#                                @sentry/vite-plugin to upload source maps at
-#                                build time (see vite.config.js).
-#      Plus the existing VITE_FIREBASE_* and VITE_SENTRY_DSN secrets used by deploy.yml.
-#
-# Drop at .github/workflows/preview-deploy.yml in the RENEW repo.
-#
-# This workflow does TWO deploys per push:
-#   1. Per-branch URL — /preview/<branch-slug>/  (existing behaviour, unchanged)
-#   2. Stable URL     — /preview/latest-<token>/  (overwritten on every push;
-#                       this is the one Emmanuel bookmarks on his phone)
-# A small fixed banner is injected into the stable build's index.html so it's
-# obvious at a glance which branch + commit + time you're looking at.
+# Replaces the per-app full templates (preview-deploy-{renew,pillar,burden}.yml)
+# which each duplicated ~200 lines of the same logic. This one is ~25 lines.
 
 name: preview-deploy
 
@@ -46,157 +23,17 @@ concurrency:
   group: preview-${{ github.ref }}
   cancel-in-progress: true
 
-permissions:
-  contents: read
-  pull-requests: write
-
-env:
-  PREVIEWS_REPO_OWNER: aaemmanuel-created      # change if your GitHub username differs
-  PREVIEWS_REPO_NAME: renew-previews
-  PREVIEWS_PAGES_HOST: aaemmanuel-created.github.io/renew-previews
-
 jobs:
-  build-and-deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'npm'
-
-      - name: Compute branch slug
-        id: slug
-        run: |
-          BRANCH="${GITHUB_REF_NAME}"
-          SLUG="$(echo "$BRANCH" | tr '/_' '--' | tr -cd 'a-zA-Z0-9-' | tr 'A-Z' 'a-z')"
-          echo "value=$SLUG" >> "$GITHUB_OUTPUT"
-
-      - name: Install
-        run: npm ci --ignore-scripts
-
-      - name: Build (with preview base path)
-        env:
-          PREVIEW_BASE: /renew-previews/preview/${{ steps.slug.outputs.value }}/
-          SENTRY_AUTH_TOKEN:               ${{ secrets.SENTRY_AUTH_TOKEN }}
-          VITE_FIREBASE_API_KEY:           ${{ secrets.VITE_FIREBASE_API_KEY }}
-          VITE_FIREBASE_AUTH_DOMAIN:       ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
-          VITE_FIREBASE_PROJECT_ID:        ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
-          VITE_FIREBASE_STORAGE_BUCKET:    ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
-          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
-          VITE_FIREBASE_APP_ID:            ${{ secrets.VITE_FIREBASE_APP_ID }}
-          VITE_SENTRY_DSN:                 ${{ secrets.VITE_SENTRY_DSN }}
-        run: npx vite build --base "$PREVIEW_BASE"
-
-      - name: Deploy to previews repo (per-branch URL)
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          personal_token: ${{ secrets.PREVIEW_DEPLOY_TOKEN }}
-          external_repository: ${{ env.PREVIEWS_REPO_OWNER }}/${{ env.PREVIEWS_REPO_NAME }}
-          publish_branch: gh-pages
-          publish_dir: ./dist
-          destination_dir: preview/${{ steps.slug.outputs.value }}
-          keep_files: true
-          commit_message: "preview: ${{ github.ref_name }} @ ${{ github.sha }}"
-
-      # ──────────────────────────────────────────────────────────────────
-      # Stable URL build — same code, different base path so assets resolve
-      # under /preview/latest-<token>/. Vite hard-codes the base into asset
-      # URLs at build time, so we have to build twice. ~1 extra minute of CI
-      # per push; well within the GH Actions budget.
-      # ──────────────────────────────────────────────────────────────────
-      - name: Stable slug check
-        id: stable
-        env:
-          STABLE: ${{ secrets.PREVIEW_STABLE_SLUG }}
-        run: |
-          if [ -z "$STABLE" ]; then
-            echo "PREVIEW_STABLE_SLUG secret not set — skipping stable-URL deploy."
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-            echo "dest=preview/latest-$STABLE" >> "$GITHUB_OUTPUT"
-            echo "url=https://${{ env.PREVIEWS_PAGES_HOST }}/preview/latest-$STABLE/" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Build (stable base path)
-        if: steps.stable.outputs.skip == 'false'
-        env:
-          PREVIEW_BASE: /renew-previews/${{ steps.stable.outputs.dest }}/
-          SENTRY_AUTH_TOKEN:               ${{ secrets.SENTRY_AUTH_TOKEN }}
-          VITE_FIREBASE_API_KEY:           ${{ secrets.VITE_FIREBASE_API_KEY }}
-          VITE_FIREBASE_AUTH_DOMAIN:       ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
-          VITE_FIREBASE_PROJECT_ID:        ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
-          VITE_FIREBASE_STORAGE_BUCKET:    ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
-          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
-          VITE_FIREBASE_APP_ID:            ${{ secrets.VITE_FIREBASE_APP_ID }}
-          VITE_SENTRY_DSN:                 ${{ secrets.VITE_SENTRY_DSN }}
-        run: |
-          rm -rf dist
-          npx vite build --base "$PREVIEW_BASE"
-
-      - name: Inject preview banner into stable build
-        if: steps.stable.outputs.skip == 'false'
-        env:
-          BRANCH: ${{ github.ref_name }}
-          SHORTSHA: ${{ github.sha }}
-        run: |
-          SHORT="${SHORTSHA:0:7}"
-          STAMP="$(date -u +'%Y-%m-%d %H:%MZ')"
-          BANNER="<div id=\"pva-preview-banner\" style=\"position:fixed;top:0;left:0;right:0;z-index:2147483647;background:#0a0a0a;color:#fff;font:11px/1.4 -apple-system,system-ui,sans-serif;padding:5px 10px;text-align:center;opacity:0.88;pointer-events:none\">PREVIEW &middot; ${BRANCH} &middot; ${SHORT} &middot; ${STAMP}</div>"
-          # Insert immediately after <body...> opening tag
-          python3 - "$BANNER" <<'PY'
-          import re, sys, pathlib
-          banner = sys.argv[1]
-          p = pathlib.Path("dist/index.html")
-          html = p.read_text()
-          html = re.sub(r"(<body[^>]*>)", r"\1" + banner, html, count=1, flags=re.IGNORECASE)
-          p.write_text(html)
-          PY
-
-      - name: Deploy to previews repo (stable URL)
-        if: steps.stable.outputs.skip == 'false'
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          personal_token: ${{ secrets.PREVIEW_DEPLOY_TOKEN }}
-          external_repository: ${{ env.PREVIEWS_REPO_OWNER }}/${{ env.PREVIEWS_REPO_NAME }}
-          publish_branch: gh-pages
-          publish_dir: ./dist
-          destination_dir: ${{ steps.stable.outputs.dest }}
-          keep_files: true
-          commit_message: "preview-latest: ${{ github.ref_name }} @ ${{ github.sha }}"
-
-      - name: Find associated PR
-        id: pr
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const prs = await github.rest.pulls.list({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              state: 'open',
-              head: `${context.repo.owner}:${context.ref.replace('refs/heads/', '')}`,
-            });
-            if (prs.data.length === 0) { core.setOutput('number', ''); return; }
-            core.setOutput('number', String(prs.data[0].number));
-
-      - name: Sticky PR comment with preview URL
-        if: steps.pr.outputs.number != ''
-        uses: marocchino/sticky-pull-request-comment@v2
-        with:
-          number: ${{ steps.pr.outputs.number }}
-          header: pva-preview
-          message: |
-            🔍 **Preview deploy ready**
-
-            Branch: `${{ github.ref_name }}`
-            Per-branch URL: https://${{ env.PREVIEWS_PAGES_HOST }}/preview/${{ steps.slug.outputs.value }}/
-            Stable URL (your phone bookmark): ${{ steps.stable.outputs.url || '— set PREVIEW_STABLE_SLUG secret to enable —' }}
-            Commit: ${{ github.sha }}
-
-            Preview lives in `${{ env.PREVIEWS_REPO_OWNER }}/${{ env.PREVIEWS_REPO_NAME }}` — production at `aaemmanuel-created.github.io/renew/` is untouched.
-
-            iOS/Android builds will not run until you reply `APPROVE NATIVE` in chat.
+  preview:
+    uses: aaemmanuel-created/pva-workflow/.github/workflows/_reusable-preview-web.yml@main
+    with:
+      app_name: renew                                     # renew | pillar | burden
+      build_dir: .                              # "." for renew (flat), "burden-app" for burden monorepo, "pva-deploy" for pillar
+      dist_dir: dist                                      # vite default; PILLAR static = "." (and set static_only: true)
+      # static_only: true                                 # uncomment for PILLAR (no-build)
+      node_version: '22'
+      previews_repo: aaemmanuel-created/renew-previews
+      previews_pages_host: aaemmanuel-created.github.io/renew-previews
+    secrets:
+      PREVIEW_DEPLOY_TOKEN: ${{ secrets.PREVIEW_DEPLOY_TOKEN }}
+      PREVIEW_STABLE_SLUG: ${{ secrets.PREVIEW_STABLE_SLUG }}
